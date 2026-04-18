@@ -9,11 +9,17 @@ Before you begin, ensure you have the following installed:
 * [Dart SDK](https://dart.dev)
 * A code editor like [VS Code](https://visualstudio.com) or [Android Studio](https://android.com)
 
-## Getting Started
-
-Follow these steps to get the project up and running on your local machine.
-
-## Clone the repository
+## 1.Clone the repository
 ```bash
 git clone https://github.com
 cd ineTeam
+```
+## 2.Install dependencies
+```bash
+flutter pub get
+```
+## 3.Run the project
+Use an emulator or a browser to your choosing (chrome preferred):
+```bash
+flutter run -d chrome
+```
