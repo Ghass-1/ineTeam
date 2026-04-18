@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
-import 'pages/login_page.dart';
-import 'pages/home_page.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'core/theme/app_theme.dart';
+import 'core/router/app_router.dart';
+import 'features/auth/auth_provider.dart';
+import 'features/profile/user_provider.dart';
+import 'features/matches/match_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,23 +21,72 @@ class IneTeamApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'IneTeam',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
-        useMaterial3: true,
-      ),
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-        // Si snapshot a des données, l'utilisateur est connecté
-        if (snapshot.hasData) {
-          return const Homepage();
-        }
-        // Sinon, on affiche le login
-        return const LoginPage();
-      },
-    ),
-      );
+    return MultiProvider(
+      providers: [
+        // Theme mode notifier for dark/light toggle
+        ChangeNotifierProvider<ValueNotifier<ThemeMode>>(
+          create: (_) => ValueNotifier<ThemeMode>(ThemeMode.light),
+        ),
+
+        // Auth provider — manages login/signup state
+        ChangeNotifierProvider<AuthProvider>(
+          create: (_) => AuthProvider(),
+        ),
+
+        // User provider — manages profile state
+        ChangeNotifierProvider<UserProvider>(
+          create: (_) => UserProvider(),
+        ),
+
+        // Match provider — manages matches state
+        ChangeNotifierProvider<MatchProvider>(
+          create: (_) => MatchProvider(),
+        ),
+      ],
+      child: const _AppWithTheme(),
+    );
+  }
+}
+
+/// Extracted widget so it can read providers from the tree.
+class _AppWithTheme extends StatefulWidget {
+  const _AppWithTheme();
+
+  @override
+  State<_AppWithTheme> createState() => _AppWithThemeState();
+}
+
+class _AppWithThemeState extends State<_AppWithTheme> {
+  @override
+  void initState() {
+    super.initState();
+    // Listen to auth changes to initialize dependent providers
+    final auth = context.read<AuthProvider>();
+    auth.addListener(_onAuthChanged);
+  }
+
+  void _onAuthChanged() {
+    final auth = context.read<AuthProvider>();
+    if (auth.isAuthenticated) {
+      // Load user profile and match streams once authenticated
+      context.read<UserProvider>().loadProfile(auth.userId);
+      context.read<MatchProvider>().initStreams(auth.userId);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authProvider = context.watch<AuthProvider>();
+    final themeMode = context.watch<ValueNotifier<ThemeMode>>().value;
+    final router = AppRouter.router(authProvider);
+
+    return MaterialApp.router(
+      title: 'ineTeam',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
+      routerConfig: router,
+    );
   }
 }

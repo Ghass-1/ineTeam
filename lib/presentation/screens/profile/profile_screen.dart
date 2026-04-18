@@ -1,0 +1,289 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/helpers.dart';
+import '../../../features/auth/auth_provider.dart';
+
+import '../../widgets/player_avatar.dart';
+import '../../widgets/skill_indicator.dart';
+
+/// User profile screen with stats, settings, and logout.
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final auth = context.watch<AuthProvider>();
+    final profile = auth.userProfile;
+
+    if (profile == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Profile')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Profile'),
+        actions: [
+          // Dark mode toggle
+          IconButton(
+            icon: Icon(
+              theme.brightness == Brightness.dark
+                  ? Icons.light_mode
+                  : Icons.dark_mode,
+            ),
+            onPressed: () {
+              // Toggle is handled by ThemeProvider in main.dart
+              final themeNotifier =
+                  context.read<ValueNotifier<ThemeMode>>();
+              themeNotifier.value = themeNotifier.value == ThemeMode.dark
+                  ? ThemeMode.light
+                  : ThemeMode.dark;
+            },
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          children: [
+            const SizedBox(height: 24),
+
+            // ── Avatar + Name ──
+            PlayerAvatar(
+              name: profile.name,
+              imageUrl: profile.profilePictureUrl,
+              radius: 50,
+              skillLevel: profile.skillLevel,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              profile.name,
+              style: theme.textTheme.displayMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              profile.email,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withAlpha(150),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // ── Skill Level Card ──
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Helpers.skillColor(profile.skillLevel).withAlpha(30),
+                    Helpers.skillColor(profile.skillLevel).withAlpha(10),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Helpers.skillColor(profile.skillLevel).withAlpha(40),
+                ),
+              ),
+              child: Row(
+                children: [
+                  SkillIndicator(
+                    skillLevel: profile.skillLevel,
+                    size: 56,
+                    showLabel: true,
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Skill Rating',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface.withAlpha(150),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${profile.skillLevel}/100',
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: Helpers.skillColor(profile.skillLevel),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // ── Stats Row ──
+            Row(
+              children: [
+                _buildStatCard(
+                  context,
+                  Icons.add_circle_outline,
+                  '${profile.createdMatches.length}',
+                  'Created',
+                ),
+                const SizedBox(width: 12),
+                _buildStatCard(
+                  context,
+                  Icons.login,
+                  '${profile.joinedMatches.length}',
+                  'Joined',
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // ── Sports Badges ──
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'My Sports',
+                style: theme.textTheme.titleLarge,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: profile.sports.map((sport) {
+                final color = Helpers.sportColor(sport);
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: color.withAlpha(25),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: color.withAlpha(60)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Helpers.sportIcon(sport),
+                          size: 18, color: color),
+                      const SizedBox(width: 6),
+                      Text(
+                        sport,
+                        style: TextStyle(
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Frequency Badge ──
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withAlpha(15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withAlpha(40),
+                  ),
+                ),
+                child: Text(
+                  '🔄 ${profile.frequency[0].toUpperCase()}${profile.frequency.substring(1)} player',
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 36),
+
+            // ── Logout Button ──
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: () => auth.signOut(),
+                icon: const Icon(Icons.logout, color: Colors.red),
+                label: const Text('Sign Out'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // App version
+            Text(
+              '${AppInfo.appName} v1.0.0',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withAlpha(80),
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 30),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(
+    BuildContext context,
+    IconData icon,
+    String value,
+    String label,
+  ) {
+    final theme = Theme.of(context);
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary.withAlpha(10),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: theme.colorScheme.outline.withAlpha(30),
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: theme.colorScheme.primary),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withAlpha(150),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

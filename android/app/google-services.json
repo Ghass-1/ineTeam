@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "944897367224",
-    "project_id": "ineteam-2026",
-    "storage_bucket": "ineteam-2026.firebasestorage.app"
+    "project_number": "178378132135",
+    "project_id": "ineteam-cloud",
+    "storage_bucket": "ineteam-cloud.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:944897367224:android:ff32751dec5491db56e84d",
+        "mobilesdk_app_id": "1:178378132135:android:5fa2fc1e16be4e9dd02982",
         "android_client_info": {
           "package_name": "com.example.ineteam"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyD5wu1Sx1TiNfxff4kpGnMgaGDMsXFwmmE"
+          "current_key": "AIzaSyAdCT_3vHFBxQRK8lMJqquWHgd25FXLjYA"
         }
       ],
       "services": {

@@ -41,46 +41,49 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBBav6ggR8TjojDGpMn_S5q6govt1moP6I',
-    appId: '1:944897367224:web:5123454a150d53ac56e84d',
-    messagingSenderId: '944897367224',
-    projectId: 'ineteam-2026',
-    authDomain: 'ineteam-2026.firebaseapp.com',
-    storageBucket: 'ineteam-2026.firebasestorage.app',
+    apiKey: 'AIzaSyDSIObRgQxO_hO-d750XWaujgFt1yegxPk',
+    appId: '1:178378132135:web:9bfaf5e4543579c1d02982',
+    messagingSenderId: '178378132135',
+    projectId: 'ineteam-cloud',
+    authDomain: 'ineteam-cloud.firebaseapp.com',
+    storageBucket: 'ineteam-cloud.firebasestorage.app',
+    measurementId: 'G-CRC1K6SSF0',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyD5wu1Sx1TiNfxff4kpGnMgaGDMsXFwmmE',
-    appId: '1:944897367224:android:ff32751dec5491db56e84d',
-    messagingSenderId: '944897367224',
-    projectId: 'ineteam-2026',
-    storageBucket: 'ineteam-2026.firebasestorage.app',
+    apiKey: 'AIzaSyAdCT_3vHFBxQRK8lMJqquWHgd25FXLjYA',
+    appId: '1:178378132135:android:5fa2fc1e16be4e9dd02982',
+    messagingSenderId: '178378132135',
+    projectId: 'ineteam-cloud',
+    storageBucket: 'ineteam-cloud.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBDzO8u4zg3l9tkj_a7U8VmBkXsAF-ROJA',
-    appId: '1:944897367224:ios:d5912e8713fd9bd256e84d',
-    messagingSenderId: '944897367224',
-    projectId: 'ineteam-2026',
-    storageBucket: 'ineteam-2026.firebasestorage.app',
+    apiKey: 'AIzaSyDjGZGs2vSMC-OrHG03c4lNEK2Qqm_Ff4Q',
+    appId: '1:178378132135:ios:21504259ab6505fed02982',
+    messagingSenderId: '178378132135',
+    projectId: 'ineteam-cloud',
+    storageBucket: 'ineteam-cloud.firebasestorage.app',
     iosBundleId: 'com.example.ineteam',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBDzO8u4zg3l9tkj_a7U8VmBkXsAF-ROJA',
-    appId: '1:944897367224:ios:d5912e8713fd9bd256e84d',
-    messagingSenderId: '944897367224',
-    projectId: 'ineteam-2026',
-    storageBucket: 'ineteam-2026.firebasestorage.app',
+    apiKey: 'AIzaSyDjGZGs2vSMC-OrHG03c4lNEK2Qqm_Ff4Q',
+    appId: '1:178378132135:ios:21504259ab6505fed02982',
+    messagingSenderId: '178378132135',
+    projectId: 'ineteam-cloud',
+    storageBucket: 'ineteam-cloud.firebasestorage.app',
     iosBundleId: 'com.example.ineteam',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBBav6ggR8TjojDGpMn_S5q6govt1moP6I',
-    appId: '1:944897367224:web:3751bc487da0254556e84d',
-    messagingSenderId: '944897367224',
-    projectId: 'ineteam-2026',
-    authDomain: 'ineteam-2026.firebaseapp.com',
-    storageBucket: 'ineteam-2026.firebasestorage.app',
+    apiKey: 'AIzaSyDSIObRgQxO_hO-d750XWaujgFt1yegxPk',
+    appId: '1:178378132135:web:fd6a5782ce81bf1ad02982',
+    messagingSenderId: '178378132135',
+    projectId: 'ineteam-cloud',
+    authDomain: 'ineteam-cloud.firebaseapp.com',
+    storageBucket: 'ineteam-cloud.firebasestorage.app',
+    measurementId: 'G-S4TN4MFE20',
   );
+
 }
