@@ -18,8 +18,6 @@ class MyMatchesScreen extends StatefulWidget {
 class _MyMatchesScreenState extends State<MyMatchesScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  int _upcomingCount = 0;
-  int _pastCount = 0;
 
   @override
   void initState() {
@@ -33,68 +31,55 @@ class _MyMatchesScreenState extends State<MyMatchesScreen>
     super.dispose();
   }
 
-  /// Updates tab counts when matches change
-  void _updateCounts(List<MatchModel> combined) {
-    final now = DateTime.now();
-    final upcoming = combined.where((m) => m.dateTime.isAfter(now)).length;
-    final past = combined
-        .where((m) => m.dateTime.isBefore(now) || m.dateTime.isAtSameMomentAs(now))
-        .length;
-
-    if (_upcomingCount != upcoming || _pastCount != past) {
-      setState(() {
-        _upcomingCount = upcoming;
-        _pastCount = past;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Matches'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: [
-            Tab(
-              icon: const Icon(Icons.schedule),
-              text: _upcomingCount > 0 ? 'Upcoming ($_upcomingCount)' : 'Upcoming',
+    return Consumer2<MatchProvider, AuthProvider>(
+      builder: (context, matchProvider, authProvider, _) {
+        // Get all user matches (both created and joined)
+        final joinedMatchesOnly = matchProvider.userMatches
+            .where((m) => m.creatorId != authProvider.userId)
+            .toList();
+        
+        final createdMatches = matchProvider.createdMatches;
+        final combined = {...joinedMatchesOnly, ...createdMatches}.toList();
+
+        // Calculate counts
+        final now = DateTime.now();
+        final upcomingCount = combined.where((m) => m.dateTime.isAfter(now)).length;
+        final pastCount = combined
+            .where((m) => m.dateTime.isBefore(now) || m.dateTime.isAtSameMomentAs(now))
+            .length;
+
+        // Split into upcoming and past
+        final upcomingMatches = combined
+            .where((m) => m.dateTime.isAfter(now))
+            .toList();
+        final pastMatches = combined
+            .where((m) => m.dateTime.isBefore(now) || m.dateTime.isAtSameMomentAs(now))
+            .toList();
+
+        // Sort both lists
+        upcomingMatches.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+        pastMatches.sort((a, b) => b.dateTime.compareTo(a.dateTime)); // Newest first
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('My Matches'),
+            bottom: TabBar(
+              controller: _tabController,
+              tabs: [
+                Tab(
+                  icon: const Icon(Icons.schedule),
+                  text: upcomingCount > 0 ? 'Upcoming ($upcomingCount)' : 'Upcoming',
+                ),
+                Tab(
+                  icon: const Icon(Icons.history),
+                  text: pastCount > 0 ? 'Past ($pastCount)' : 'Past',
+                ),
+              ],
             ),
-            Tab(
-              icon: const Icon(Icons.history),
-              text: _pastCount > 0 ? 'Past ($_pastCount)' : 'Past',
-            ),
-          ],
-        ),
-      ),
-      body: Consumer2<MatchProvider, AuthProvider>(
-        builder: (context, matchProvider, authProvider, _) {
-          // Get all user matches (both created and joined)
-          final joinedMatchesOnly = matchProvider.userMatches
-              .where((m) => m.creatorId != authProvider.userId)
-              .toList();
-          
-          final createdMatches = matchProvider.createdMatches;
-          final combined = {...joinedMatchesOnly, ...createdMatches}.toList();
-
-          // Update counts for tab labels
-          _updateCounts(combined);
-
-          // Split into upcoming and past
-          final now = DateTime.now();
-          final upcomingMatches = combined
-              .where((m) => m.dateTime.isAfter(now))
-              .toList();
-          final pastMatches = combined
-              .where((m) => m.dateTime.isBefore(now) || m.dateTime.isAtSameMomentAs(now))
-              .toList();
-
-          // Sort both lists
-          upcomingMatches.sort((a, b) => a.dateTime.compareTo(b.dateTime));
-          pastMatches.sort((a, b) => b.dateTime.compareTo(a.dateTime)); // Newest first
-
-          return TabBarView(
+          ),
+          body: TabBarView(
             controller: _tabController,
             children: [
               // ── Upcoming Matches Tab ──
@@ -113,9 +98,9 @@ class _MyMatchesScreenState extends State<MyMatchesScreen>
                 emptySubtitle: 'Your completed matches will appear here.',
               ),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
