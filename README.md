@@ -10,7 +10,7 @@ Make sure to have installed flutter SDK, if not:
 Clone the repository:
 ```bash
 git clone https://github.com/Ghass-1/ineTeam
-cd /ineTeam
+cd /ineTeam```
 
 Run the project, specify a browser or emulator to your choosing (chrome recommended):
 ```bash
