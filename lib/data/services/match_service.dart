@@ -36,7 +36,9 @@ class MatchService {
 
   /// Returns all reserved date times for a particular location on a specific day.
   Future<List<DateTime>> getReservedTimesForDay(
-      String location, DateTime date) async {
+    String location,
+    DateTime date,
+  ) async {
     // Only query by location to avoid requiring a composite index setup
     final query = await _matchesCollection
         .where('location', isEqualTo: location)
@@ -47,7 +49,7 @@ class MatchService {
     for (var doc in query.docs) {
       final data = doc.data() as Map<String, dynamic>;
       final status = data['status'] as String? ?? 'open';
-      
+
       // Ignore completed or cancelled matches
       if (status != 'open' && status != 'full') continue;
 
@@ -72,10 +74,16 @@ class MatchService {
         //.where('status', whereIn: ['open'])
         .orderBy('dateTime', descending: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) =>
-                MatchModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => MatchModel.fromMap(
+                  doc.data() as Map<String, dynamic>,
+                  doc.id,
+                ),
+              )
+              .toList(),
+        );
   }
 
   /// Real-time stream of a single match for live updates.
@@ -93,25 +101,33 @@ class MatchService {
       final doc = await transaction.get(_matchesCollection.doc(matchId));
       if (!doc.exists) return false;
 
-      final match = MatchModel.fromMap(doc.data() as Map<String, dynamic>, matchId);
+      final match = MatchModel.fromMap(
+        doc.data() as Map<String, dynamic>,
+        matchId,
+      );
 
       // Prevent joining a full match or duplicates
       if (match.isFull || match.hasPlayer(userId)) return false;
-      
+
       // Determine max players per team
       final maxPerTeam = match.maxPlayers ~/ 2;
-      
+
       List<String> currentTeamArray;
-      if (teamId == 'A') currentTeamArray = match.teamA;
-      else if (teamId == 'B') currentTeamArray = match.teamB;
-      else return false;
+      if (teamId == 'A') {
+        currentTeamArray = match.teamA;
+      } else if (teamId == 'B')
+        currentTeamArray = match.teamB;
+      else
+        return false;
 
       // Prevent joining full team
       if (currentTeamArray.length >= maxPerTeam) return false;
 
       final newPlayerIds = [...match.playerIds, userId];
       final newTeamArray = [...currentTeamArray, userId];
-      final newStatus = newPlayerIds.length >= match.maxPlayers ? 'full' : 'open';
+      final newStatus = newPlayerIds.length >= match.maxPlayers
+          ? 'full'
+          : 'open';
 
       transaction.update(_matchesCollection.doc(matchId), {
         'playerIds': newPlayerIds,
@@ -130,13 +146,18 @@ class MatchService {
       final doc = await transaction.get(_matchesCollection.doc(matchId));
       if (!doc.exists) return;
 
-      final match = MatchModel.fromMap(doc.data() as Map<String, dynamic>, matchId);
+      final match = MatchModel.fromMap(
+        doc.data() as Map<String, dynamic>,
+        matchId,
+      );
 
       final newPlayerIds = match.playerIds.where((id) => id != userId).toList();
       final newTeamA = match.teamA.where((id) => id != userId).toList();
       final newTeamB = match.teamB.where((id) => id != userId).toList();
 
-      final newStatus = newPlayerIds.length >= match.maxPlayers ? 'full' : 'open';
+      final newStatus = newPlayerIds.length >= match.maxPlayers
+          ? 'full'
+          : 'open';
 
       transaction.update(_matchesCollection.doc(matchId), {
         'playerIds': newPlayerIds,
@@ -163,10 +184,16 @@ class MatchService {
         .where('playerIds', arrayContains: userId)
         .orderBy('dateTime', descending: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) =>
-                MatchModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => MatchModel.fromMap(
+                  doc.data() as Map<String, dynamic>,
+                  doc.id,
+                ),
+              )
+              .toList(),
+        );
   }
 
   /// Fetches matches created by the user.
@@ -175,9 +202,15 @@ class MatchService {
         .where('creatorId', isEqualTo: userId)
         .orderBy('dateTime', descending: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) =>
-                MatchModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) => MatchModel.fromMap(
+                  doc.data() as Map<String, dynamic>,
+                  doc.id,
+                ),
+              )
+              .toList(),
+        );
   }
 }

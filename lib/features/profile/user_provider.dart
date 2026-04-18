@@ -22,12 +22,35 @@ class UserProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   // ─── Load Profile ────────────────────────────────────────────────────────
-  void loadProfile(String uid) {
+void loadProfile(String uid) {
+    print("Tentative de chargement du profil pour l'UID : $uid");
+    
     _profileSub?.cancel();
-    _profileSub = _userService.userProfileStream(uid).listen((user) {
-      _currentUser = user;
-      notifyListeners();
-    });
+
+    // 1. Vérification de sécurité
+    if (uid.isEmpty) {
+      print("Erreur : l'UID fourni est vide.");
+      return;
+    }
+
+    try {
+      // 2. On écoute le stream avec une gestion d'erreur intégrée
+      _profileSub = _userService.userProfileStream(uid).listen(
+        (user) {
+          print("Profil chargé avec succès pour : ${user?.name}");
+          _currentUser = user;
+          notifyListeners();
+        },
+        onError: (error) {
+          print("❌ Erreur Firestore Stream : $error");
+          _errorMessage = "Erreur de connexion à la base de données.";
+          notifyListeners();
+        },
+        cancelOnError: true,
+      );
+    } catch (e) {
+      print("💥 Crash évité dans loadProfile : $e");
+    }
   }
 
   // ─── Update Profile ──────────────────────────────────────────────────────

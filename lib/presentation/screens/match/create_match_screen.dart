@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/helpers.dart';
-import '../../../core/utils/validators.dart';
 import '../../../features/auth/auth_provider.dart';
 import '../../../features/matches/match_provider.dart';
 import '../../../data/services/match_service.dart';
@@ -57,16 +56,25 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
   Future<void> _fetchReservedTimes() async {
     final service = MatchService();
     final reserved = await service.getReservedTimesForDay(
-        _selectedLocation, _selectedDate);
-    
+      _selectedLocation,
+      _selectedDate,
+    );
+
     if (mounted) {
       setState(() {
-        _reservedTimes = reserved.map((dt) => TimeOfDay.fromDateTime(dt)).toList();
-        
+        _reservedTimes = reserved
+            .map((dt) => TimeOfDay.fromDateTime(dt))
+            .toList();
+
         // Auto-select first available time
-        if (_reservedTimes.any((t) => t.hour == _selectedTime.hour && t.minute == _selectedTime.minute)) {
+        if (_reservedTimes.any(
+          (t) =>
+              t.hour == _selectedTime.hour && t.minute == _selectedTime.minute,
+        )) {
           for (final t in _availableTimes) {
-            if (!_reservedTimes.any((rt) => rt.hour == t.hour && rt.minute == t.minute)) {
+            if (!_reservedTimes.any(
+              (rt) => rt.hour == t.hour && rt.minute == t.minute,
+            )) {
               _selectedTime = t;
               break;
             }
@@ -110,8 +118,11 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
     );
 
     if (dateTime.isBefore(DateTime.now())) {
-      Helpers.showSnackBar(context, 'Match must be in the future',
-          isError: true);
+      Helpers.showSnackBar(
+        context,
+        'Match must be in the future',
+        isError: true,
+      );
       return;
     }
 
@@ -127,8 +138,12 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
       location: _selectedLocation,
       dateTime: dateTime,
       maxPlayers: _maxPlayers,
-      teamAName: _teamAController.text.trim().isEmpty ? 'Team A' : _teamAController.text.trim(),
-      teamBName: _teamBController.text.trim().isEmpty ? 'Team B' : _teamBController.text.trim(),
+      teamAName: _teamAController.text.trim().isEmpty
+          ? 'Team A'
+          : _teamAController.text.trim(),
+      teamBName: _teamBController.text.trim().isEmpty
+          ? 'Team B'
+          : _teamBController.text.trim(),
       description: _descriptionController.text.trim().isEmpty
           ? null
           : _descriptionController.text.trim(),
@@ -157,9 +172,7 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
     final sportColor = Helpers.sportColor(_selectedSport);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Match'),
-      ),
+      appBar: AppBar(title: const Text('Create Match')),
       body: LoadingOverlay(
         isLoading: _isSubmitting,
         child: SingleChildScrollView(
@@ -172,10 +185,7 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
                 const SizedBox(height: 16),
 
                 // ── Sport Selection ──
-                Text(
-                  'Sport',
-                  style: theme.textTheme.titleLarge,
-                ),
+                Text('Sport', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 10,
@@ -213,10 +223,7 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
 
                 const SizedBox(height: 28),
 
-                Text(
-                  'Location',
-                  style: theme.textTheme.titleLarge,
-                ),
+                Text('Location', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 10,
@@ -225,28 +232,26 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
                       .firstWhere((s) => s.label == _selectedSport)
                       .availableLocations
                       .map((loc) {
-                    final isSelected = _selectedLocation == loc;
-                    return ChoiceChip(
-                      selected: isSelected,
-                      label: Text(loc),
-                      selectedColor: sportColor.withAlpha(40),
-                      onSelected: (_) {
-                        setState(() {
-                          _selectedLocation = loc;
-                        });
-                        _fetchReservedTimes();
-                      },
-                    );
-                  }).toList(),
+                        final isSelected = _selectedLocation == loc;
+                        return ChoiceChip(
+                          selected: isSelected,
+                          label: Text(loc),
+                          selectedColor: sportColor.withAlpha(40),
+                          onSelected: (_) {
+                            setState(() {
+                              _selectedLocation = loc;
+                            });
+                            _fetchReservedTimes();
+                          },
+                        );
+                      })
+                      .toList(),
                 ),
 
                 const SizedBox(height: 20),
 
-            // ── Date ──
-                Text(
-                  'Date & Time',
-                  style: theme.textTheme.titleLarge,
-                ),
+                // ── Date ──
+                Text('Date & Time', style: theme.textTheme.titleLarge),
                 const SizedBox(height: 12),
                 InkWell(
                   onTap: _pickDate,
@@ -254,8 +259,11 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
                   child: InputDecorator(
                     decoration: InputDecoration(
                       labelText: 'Select Date',
-                      prefixIcon: Icon(Icons.calendar_today,
-                          color: sportColor, size: 20),
+                      prefixIcon: Icon(
+                        Icons.calendar_today,
+                        color: sportColor,
+                        size: 20,
+                      ),
                     ),
                     child: Text(
                       Helpers.formatDate(_selectedDate),
@@ -264,16 +272,18 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // ── Time Toggles ──
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
                   children: _availableTimes.map((time) {
-                    final isSelected = _selectedTime.hour == time.hour &&
+                    final isSelected =
+                        _selectedTime.hour == time.hour &&
                         _selectedTime.minute == time.minute;
                     final isReserved = _reservedTimes.any(
-                        (t) => t.hour == time.hour && t.minute == time.minute);
+                      (t) => t.hour == time.hour && t.minute == time.minute,
+                    );
 
                     return ChoiceChip(
                       selected: isSelected && !isReserved,
@@ -306,10 +316,7 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
                 const SizedBox(height: 28),
 
                 // ── Max Players Stepper ──
-                Text(
-                  'Format (Players)',
-                  style: theme.textTheme.titleMedium,
-                ),
+                Text('Format (Players)', style: theme.textTheme.titleMedium),
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -346,9 +353,9 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 20),
-                
+
                 // ── Team Names ──
                 Row(
                   children: [

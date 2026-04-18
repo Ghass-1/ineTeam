@@ -10,7 +10,6 @@ import '../../../data/models/match_model.dart';
 import '../../../data/models/user_model.dart';
 import '../../widgets/player_avatar.dart';
 import '../../widgets/skill_indicator.dart';
-import '../../widgets/team_balance_view.dart';
 
 /// Match detail screen showing full match info, players, and team balancing.
 class MatchDetailScreen extends StatelessWidget {
@@ -58,29 +57,28 @@ class MatchDetailScreen extends StatelessWidget {
 
                       if (!context.mounted || !confirmed) return;
 
-                      final success = await matchProvider.deleteMatch(
-                        matchId,
-                      );
+                      final success = await matchProvider.deleteMatch(matchId);
 
                       if (!context.mounted) return;
 
                       if (success) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Match deleted successfully')),
+                          const SnackBar(
+                            content: Text('Match deleted successfully'),
+                          ),
                         );
                         context.pop(); // go back ONLY if delete worked
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              matchProvider.errorMessage ?? 'Failed to delete match',
+                              matchProvider.errorMessage ??
+                                  'Failed to delete match',
                             ),
                           ),
                         );
                       }
-                    }
-
-                    else if (val == 'complete') {
+                    } else if (val == 'complete') {
                       final success = await matchProvider.updateMatchStatus(
                         matchId,
                         'completed',
@@ -90,14 +88,17 @@ class MatchDetailScreen extends StatelessWidget {
 
                       if (success) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Match marked as completed')),
+                          const SnackBar(
+                            content: Text('Match marked as completed'),
+                          ),
                         );
                         context.pop();
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              matchProvider.errorMessage ?? 'Failed to update match',
+                              matchProvider.errorMessage ??
+                                  'Failed to update match',
                             ),
                           ),
                         );
@@ -120,7 +121,11 @@ class MatchDetailScreen extends StatelessWidget {
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                          Icon(
+                            Icons.delete_outline,
+                            size: 20,
+                            color: Colors.red,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Delete Match',
@@ -152,9 +157,7 @@ class MatchDetailScreen extends StatelessWidget {
                       ],
                     ),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: sportColor.withAlpha(40),
-                    ),
+                    border: Border.all(color: sportColor.withAlpha(40)),
                   ),
                   child: Column(
                     children: [
@@ -181,10 +184,13 @@ class MatchDetailScreen extends StatelessWidget {
                       // Status badge
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 6),
+                          horizontal: 16,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: Helpers.matchStatusColor(match.status)
-                              .withAlpha(30),
+                          color: Helpers.matchStatusColor(
+                            match.status,
+                          ).withAlpha(30),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -247,9 +253,9 @@ class MatchDetailScreen extends StatelessWidget {
 
                 // ── Teams Display ──
                 FutureBuilder<List<UserModel>>(
-                  future: context
-                      .read<UserProvider>()
-                      .getUsersByIds(match.playerIds),
+                  future: context.read<UserProvider>().getUsersByIds(
+                    match.playerIds,
+                  ),
                   builder: (context, playerSnapshot) {
                     if (playerSnapshot.connectionState ==
                         ConnectionState.waiting) {
@@ -260,8 +266,12 @@ class MatchDetailScreen extends StatelessWidget {
                     }
 
                     final players = playerSnapshot.data ?? [];
-                    final teamAPlayers = players.where((p) => match.teamA.contains(p.uid)).toList();
-                    final teamBPlayers = players.where((p) => match.teamB.contains(p.uid)).toList();
+                    final teamAPlayers = players
+                        .where((p) => match.teamA.contains(p.uid))
+                        .toList();
+                    final teamBPlayers = players
+                        .where((p) => match.teamB.contains(p.uid))
+                        .toList();
                     final maxPerTeam = match.maxPlayers ~/ 2;
 
                     return Column(
@@ -312,34 +322,46 @@ class MatchDetailScreen extends StatelessWidget {
                 height: 56,
                 child: hasJoined
                     ? (isCreator
-                        ? ElevatedButton(
-                            onPressed: null,
-                            child: const Text('You created this match'),
-                          )
-                        : OutlinedButton(
-                            onPressed: () async {
-                              await context
-                                  .read<MatchProvider>()
-                                  .leaveMatch(matchId, auth.userId);
-                              if (context.mounted) {
-                                Helpers.showSnackBar(context, 'Left the match');
-                              }
-                            },
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.red,
-                              side: const BorderSide(color: Colors.red),
-                            ),
-                            child: const Text('Leave Match'),
-                          ))
+                          ? ElevatedButton(
+                              onPressed: null,
+                              child: const Text('You created this match'),
+                            )
+                          : OutlinedButton(
+                              onPressed: () async {
+                                await context.read<MatchProvider>().leaveMatch(
+                                  matchId,
+                                  auth.userId,
+                                );
+                                if (context.mounted) {
+                                  Helpers.showSnackBar(
+                                    context,
+                                    'Left the match',
+                                  );
+                                }
+                              },
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red,
+                                side: const BorderSide(color: Colors.red),
+                              ),
+                              child: const Text('Leave Match'),
+                            ))
                     : Row(
                         children: [
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: match.teamA.length >= match.maxPlayers ~/ 2
+                              onPressed:
+                                  match.teamA.length >= match.maxPlayers ~/ 2
                                   ? null
-                                  : () => _joinTeam(context, matchId, auth.userId, 'A'),
+                                  : () => _joinTeam(
+                                      context,
+                                      matchId,
+                                      auth.userId,
+                                      'A',
+                                    ),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF10B981), // Emerald
+                                backgroundColor: const Color(
+                                  0xFF10B981,
+                                ), // Emerald
                               ),
                               child: Text(
                                 match.teamA.length >= match.maxPlayers ~/ 2
@@ -351,9 +373,15 @@ class MatchDetailScreen extends StatelessWidget {
                           const SizedBox(width: 8),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: match.teamB.length >= match.maxPlayers ~/ 2
+                              onPressed:
+                                  match.teamB.length >= match.maxPlayers ~/ 2
                                   ? null
-                                  : () => _joinTeam(context, matchId, auth.userId, 'B'),
+                                  : () => _joinTeam(
+                                      context,
+                                      matchId,
+                                      auth.userId,
+                                      'B',
+                                    ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF38BDF8), // Sky
                               ),
@@ -374,16 +402,26 @@ class MatchDetailScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _joinTeam(BuildContext context, String matchId, String userId, String teamId) async {
-    final success = await context.read<MatchProvider>().joinMatch(matchId, userId, teamId);
+  Future<void> _joinTeam(
+    BuildContext context,
+    String matchId,
+    String userId,
+    String teamId,
+  ) async {
+    final success = await context.read<MatchProvider>().joinMatch(
+      matchId,
+      userId,
+      teamId,
+    );
     if (context.mounted) {
       if (success) {
         Helpers.showSnackBar(context, 'Joined Team $teamId! 🎉');
       } else {
         Helpers.showSnackBar(
-            context,
-            context.read<MatchProvider>().errorMessage ?? 'Cannot join',
-            isError: true);
+          context,
+          context.read<MatchProvider>().errorMessage ?? 'Cannot join',
+          isError: true,
+        );
       }
     }
   }
@@ -422,33 +460,34 @@ class MatchDetailScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: Text(
                 'No players joined yet.',
-                style: TextStyle(color: theme.colorScheme.onSurface.withAlpha(120)),
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface.withAlpha(120),
+                ),
               ),
             )
           else
-            ...players.map((player) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: PlayerAvatar(
-                    name: player.name,
-                    imageUrl: player.profilePictureUrl,
-                    skillLevel: player.skillLevel,
+            ...players.map(
+              (player) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: PlayerAvatar(
+                  name: player.name,
+                  imageUrl: player.profilePictureUrl,
+                  skillLevel: player.skillLevel,
+                ),
+                title: Text(player.name, style: theme.textTheme.titleMedium),
+                subtitle: Text(
+                  player.sports.join(', '),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withAlpha(120),
                   ),
-                  title: Text(
-                    player.name,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  subtitle: Text(
-                    player.sports.join(', '),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withAlpha(120),
-                    ),
-                  ),
-                  trailing: SkillIndicator(
-                    skillLevel: player.skillLevel,
-                    size: 36,
-                    showLabel: false,
-                  ),
-                )),
+                ),
+                trailing: SkillIndicator(
+                  skillLevel: player.skillLevel,
+                  size: 36,
+                  showLabel: false,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -480,10 +519,7 @@ class MatchDetailScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: theme.textTheme.titleMedium,
-                ),
+                Text(value, style: theme.textTheme.titleMedium),
               ],
             ),
           ),
@@ -498,7 +534,8 @@ class MatchDetailScreen extends StatelessWidget {
           builder: (context) => AlertDialog(
             title: const Text('Delete Match'),
             content: const Text(
-                'Are you sure you want to delete this match? This action cannot be undone.'),
+              'Are you sure you want to delete this match? This action cannot be undone.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
