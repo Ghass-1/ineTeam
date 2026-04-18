@@ -11,7 +11,7 @@ Before you begin, ensure you have the following installed:
 
 ## 1.Clone the repository
 ```bash
-git clone https://github.com
+git clone https://github.com/Ghass-1/ineTeam
 cd ineTeam
 ```
 ## 2.Install dependencies
