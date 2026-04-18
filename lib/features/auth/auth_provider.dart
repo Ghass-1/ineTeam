@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/models/user_model.dart';
@@ -7,6 +8,7 @@ import '../../data/services/auth_service.dart';
 import '../../data/services/user_service.dart';
 
 /// Manages authentication state and exposes it to the widget tree.
+/// Includes detailed logging for debugging signup issues.
 class AuthProvider extends ChangeNotifier {
   final AuthRepository _authRepository;
   final UserService _userService;
@@ -75,14 +77,18 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _clearError();
     try {
+      developer.log('[AuthProvider] Attempting signup for: $email');
       await _authRepository.signUp(email, password, name);
+      developer.log('[AuthProvider] Signup successful');
       _setLoading(false);
       return true;
     } on AuthServiceException catch (e) {
+      developer.log('[AuthProvider] AuthServiceException: ${e.message}');
       _setError(e.message);
       _setLoading(false);
       return false;
     } catch (e) {
+      developer.log('[AuthProvider] Unexpected error: $e', error: e);
       _setError('An unexpected error occurred.');
       _setLoading(false);
       return false;

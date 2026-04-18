@@ -70,6 +70,9 @@ class MatchProvider extends ChangeNotifier {
     _matchesSub = _matchRepository.matchesStream().listen((matches) {
       _matches = matches;
       notifyListeners();
+      
+      // Auto-delete expired matches in background
+      _autoDeleteExpiredMatches();
     });
 
     // User's joined matches
@@ -87,6 +90,20 @@ class MatchProvider extends ChangeNotifier {
       _createdMatches = matches;
       notifyListeners();
     });
+  }
+
+  /// Auto-deletes expired matches with insufficient players.
+  Future<void> _autoDeleteExpiredMatches() async {
+    try {
+      final deletedCount = await _matchRepository.autoDeleteExpiredMatches();
+      if (deletedCount > 0) {
+        // Matches were deleted, listeners will pick up changes
+        notifyListeners();
+      }
+    } catch (e) {
+      // Log silently to avoid disrupting UI
+      print('[MatchProvider] Auto-delete error: $e');
+    }
   }
 
   // ─── Create Match ────────────────────────────────────────────────────────

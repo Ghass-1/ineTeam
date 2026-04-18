@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/app_constants.dart';
+import 'dart:developer' as developer;
 import '../models/match_model.dart';
 
 /// Handles all Firestore operations for matches.
@@ -212,5 +213,59 @@ class MatchService {
               )
               .toList(),
         );
+  }
+
+  /// Checks and auto-deletes expired matches that don't have enough players.
+  /// Returns the number of matches deleted.
+  Future<int> autoDeleteExpiredMatches() async {
+    final now = DateTime.now();
+    
+    // Query matches that are expired and not already completed
+    final expiredMatches = await _matchesCollection
+        .where('dateTime', isLessThanOrEqualTo: Timestamp.fromDate(now))
+        .where('status', whereIn: ['open', 'full'])
+        .get();
+
+    int deletedCount = 0;
+
+    for (final doc in expiredMatches.docs) {
+      final match = MatchModel.fromMap(
+        doc.data() as Map<String, dynamic>,
+        doc.id,
+      );
+
+      // Check if match has fewer players than required
+      if (match.playerCount < match.maxPlayers) {
+        developer.log(
+          '[MatchService] Auto-deleting expired match: ${match.id} '
+          '(${match.playerCount}/${match.maxPlayers} players)',
+        );
+        
+        // Delete the match
+        await deleteMatch(match.id);
+        deletedCount++;
+
+        // Send notification to players (optional)
+        await _notifyPlayersOfMatchDeletion(match);
+      }
+    }
+
+    if (deletedCount > 0) {
+      developer.log('[MatchService] Auto-deleted $deletedCount expired matches');
+    }
+
+    return deletedCount;
+  }
+
+  /// Sends notifications to all players in a deleted match.
+  Future<void> _notifyPlayersOfMatchDeletion(MatchModel match) async {
+    // Note: This would require a messaging service (e.g., Cloud Messaging)
+    // For now, we'll just log it
+    developer.log(
+      '[MatchService] Would notify ${match.playerCount} players about match deletion',
+    );
+    
+    // TODO: Implement actual notifications when messaging service is set up
+    // Could store notifications in a 'notifications' collection or use FCM
   }
 }

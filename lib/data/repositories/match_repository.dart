@@ -101,6 +101,10 @@ class MatchRepository {
   /// Matches the user created.
   Stream<List<MatchModel>> createdMatchesStream(String userId) =>
       _matchService.createdMatchesStream(userId);
+
+  /// Checks and auto-deletes expired matches with insufficient players.
+  Future<int> autoDeleteExpiredMatches() =>
+      _matchService.autoDeleteExpiredMatches();
 }
 
 /// Custom exception for match repository errors.

@@ -17,7 +17,7 @@ class ProfileSetupScreen extends StatefulWidget {
 
 class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   final List<String> _selectedSports = [];
-  double _skillLevel = 50;
+  final Map<String, double> _sportSkillLevels = {}; // Per-sport skill levels
   String _frequency = 'casual';
   bool _isSubmitting = false;
 
@@ -33,10 +33,14 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final auth = context.read<AuthProvider>();
     final userProvider = context.read<UserProvider>();
 
+    // Calculate average skill level across all sports
+    final averageSkill = (_sportSkillLevels.values.fold<int>(0, (a, b) => a + b.round()) 
+        / _selectedSports.length).round();
+
     final success = await userProvider.updateProfile(
       uid: auth.userId,
       sports: _selectedSports,
-      skillLevel: _skillLevel.round(),
+      skillLevel: averageSkill,
       frequency: _frequency,
     );
 
@@ -133,59 +137,136 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
                 const SizedBox(height: 36),
 
-                // ── Skill Level Slider ──
-                Text(
-                  'Skill Level',
-                  style: theme.textTheme.titleLarge,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'How would you rate your overall skill?',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withAlpha(150),
-                  ),
-                ),
-                const SizedBox(height: 16),
+                // ── Per-Sport Skill Levels ──
+                if (_selectedSports.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Skill Level by Sport',
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Rate your skill for each sport you selected',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface.withAlpha(150),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ..._selectedSports.map((sport) {
+                        // Initialize skill level if not set
+                        _sportSkillLevels.putIfAbsent(sport, () => 50);
+                        final skillLevel = _sportSkillLevels[sport]!;
+                        final sportColor = Helpers.sportColor(sport);
 
-                // Skill labels
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildSkillLabel('Beginner', const Color(0xFF2ECC71)),
-                    _buildSkillLabel('Intermediate', const Color(0xFFF39C12)),
-                    _buildSkillLabel('Advanced', const Color(0xFFE74C3C)),
-                  ],
-                ),
-                Slider(
-                  value: _skillLevel,
-                  min: 1,
-                  max: 100,
-                  divisions: 99,
-                  activeColor: Helpers.skillColor(_skillLevel.round()),
-                  label: '${_skillLevel.round()} — ${Helpers.skillLabel(_skillLevel.round())}',
-                  onChanged: (val) {
-                    setState(() => _skillLevel = val);
-                  },
-                ),
-                Center(
-                  child: Container(
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Sport name and icon
+                              Row(
+                                children: [
+                                  Icon(
+                                    Helpers.sportIcon(sport),
+                                    color: sportColor,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      sport,
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                  // Skill badge
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Helpers.skillColor(skillLevel.round())
+                                          .withAlpha(30),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      Helpers.skillLabel(skillLevel.round()),
+                                      style: TextStyle(
+                                        color: Helpers.skillColor(skillLevel.round()),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+
+                              // Skill labels
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _buildSkillLabel('Beginner',
+                                      const Color(0xFF2ECC71)),
+                                  _buildSkillLabel('Intermediate',
+                                      const Color(0xFFF39C12)),
+                                  _buildSkillLabel('Advanced',
+                                      const Color(0xFFE74C3C)),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+
+                              // Slider for this sport
+                              SliderTheme(
+                                data: SliderThemeData(
+                                  trackHeight: 6,
+                                  activeTrackColor: sportColor,
+                                  inactiveTrackColor:
+                                      sportColor.withAlpha(50),
+                                ),
+                                child: Slider(
+                                  value: skillLevel,
+                                  min: 1,
+                                  max: 100,
+                                  divisions: 99,
+                                  activeColor: Helpers.skillColor(
+                                      skillLevel.round()),
+                                  label:
+                                      '${skillLevel.round()} — ${Helpers.skillLabel(skillLevel.round())}',
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _sportSkillLevels[sport] = val;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                  )
+                else
+                  Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
+                        horizontal: 16, vertical: 20),
                     decoration: BoxDecoration(
-                      color: Helpers.skillColor(_skillLevel.round())
-                          .withAlpha(30),
+                      color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${_skillLevel.round()} — ${Helpers.skillLabel(_skillLevel.round())}',
-                      style: TextStyle(
-                        color: Helpers.skillColor(_skillLevel.round()),
-                        fontWeight: FontWeight.w700,
-                        fontSize: 16,
+                      border: Border.all(
+                        color: theme.colorScheme.outline.withAlpha(40),
                       ),
                     ),
+                    child: Text(
+                      'Select sports above to set skill levels',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurface.withAlpha(100),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                ),
 
                 const SizedBox(height: 36),
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:developer' as developer;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../../core/constants/app_constants.dart';
@@ -14,7 +15,17 @@ class UserService {
 
   /// Creates a new user profile document in Firestore.
   Future<void> createUserProfile(UserModel user) async {
-    await _usersCollection.doc(user.uid).set(user.toMap());
+    developer.log('[UserService] Creating user profile for UID: ${user.uid}');
+    developer.log('[UserService] User data: ${user.toMap()}');
+    
+    try {
+      await _usersCollection.doc(user.uid).set(user.toMap());
+      developer.log('[UserService] User profile created successfully');
+    } catch (e) {
+      developer.log('[UserService] ERROR creating user profile: $e', 
+        error: e);
+      rethrow;
+    }
   }
 
   /// Fetches a user profile by UID.

@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:developer' as developer;
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
@@ -19,7 +20,10 @@ class AuthRepository {
 
   /// Signs up a new user and creates their Firestore profile document.
   Future<User> signUp(String email, String password, String name) async {
+    developer.log('[AuthRepository] Starting signup for email: $email');
+    
     final user = await _authService.signUp(email, password);
+    developer.log('[AuthRepository] Firebase Auth user created: ${user.uid}');
 
     // Create the initial Firestore profile
     final profile = UserModel(
@@ -28,18 +32,28 @@ class AuthRepository {
       email: email.trim().toLowerCase(),
       createdAt: DateTime.now(),
     );
-    await _userService.createUserProfile(profile);
+    
+    developer.log('[AuthRepository] Creating Firestore profile for user: ${user.uid}');
+    try {
+      await _userService.createUserProfile(profile);
+      developer.log('[AuthRepository] Firestore profile created successfully');
+    } catch (e) {
+      developer.log('[AuthRepository] ERROR creating Firestore profile: $e');
+      rethrow;
+    }
 
     return user;
   }
 
   /// Signs in an existing user.
   Future<User> signIn(String email, String password) async {
+    developer.log('[AuthRepository] Signing in user: $email');
     return await _authService.signIn(email, password);
   }
 
   /// Signs out the current user.
   Future<void> signOut() async {
+    developer.log('[AuthRepository] Signing out user');
     await _authService.signOut();
   }
 

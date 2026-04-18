@@ -5,7 +5,6 @@ import '../../../core/utils/helpers.dart';
 import '../../../features/auth/auth_provider.dart';
 
 import '../../widgets/player_avatar.dart';
-import '../../widgets/skill_indicator.dart';
 
 /// User profile screen with stats, settings, and logout.
 class ProfileScreen extends StatelessWidget {
@@ -74,120 +73,177 @@ class ProfileScreen extends StatelessWidget {
 
             const SizedBox(height: 24),
 
-            // ── Skill Level Card ──
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Helpers.skillColor(profile.skillLevel).withAlpha(30),
-                    Helpers.skillColor(profile.skillLevel).withAlpha(10),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Helpers.skillColor(profile.skillLevel).withAlpha(40),
-                ),
-              ),
-              child: Row(
-                children: [
-                  SkillIndicator(
-                    skillLevel: profile.skillLevel,
-                    size: 56,
-                    showLabel: true,
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Skill Rating',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurface.withAlpha(150),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${profile.skillLevel}/100',
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: Helpers.skillColor(profile.skillLevel),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // ── Stats Row ──
-            Row(
-              children: [
-                _buildStatCard(
-                  context,
-                  Icons.add_circle_outline,
-                  '${profile.createdMatches.length}',
-                  'Created',
-                ),
-                const SizedBox(width: 12),
-                _buildStatCard(
-                  context,
-                  Icons.login,
-                  '${profile.joinedMatches.length}',
-                  'Joined',
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── Sports Badges ──
+            // ── Skill Levels by Sport ──
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'My Sports',
+                'Skill Levels by Sport',
                 style: theme.textTheme.titleLarge,
               ),
             ),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: profile.sports.map((sport) {
-                final color = Helpers.sportColor(sport);
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: color.withAlpha(25),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: color.withAlpha(60)),
+            if (profile.sports.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: theme.colorScheme.outline.withAlpha(30),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Helpers.sportIcon(sport),
-                          size: 18, color: color),
-                      const SizedBox(width: 6),
-                      Text(
-                        sport,
-                        style: TextStyle(
-                          color: color,
-                          fontWeight: FontWeight.w600,
+                ),
+                child: Text(
+                  'No sports selected yet',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withAlpha(100),
+                  ),
+                ),
+              )
+            else
+              Column(
+                children: profile.sports.map((sport) {
+                  final color = Helpers.sportColor(sport);
+                  // Use overall skill level (could be enhanced to store per-sport later)
+                  final skillLevel = profile.skillLevel;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            color.withAlpha(20),
+                            color.withAlpha(10),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: color.withAlpha(50),
                         ),
                       ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Sport header
+                          Row(
+                            children: [
+                              Icon(
+                                Helpers.sportIcon(sport),
+                                color: color,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  sport,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Helpers.skillColor(skillLevel)
+                                      .withAlpha(25),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  Helpers.skillLabel(skillLevel),
+                                  style: TextStyle(
+                                    color: Helpers.skillColor(skillLevel),
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
 
-            const SizedBox(height: 16),
+                          // Skill bar with label
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: LinearProgressIndicator(
+                                    value: skillLevel / 100,
+                                    minHeight: 8,
+                                    backgroundColor:
+                                        color.withAlpha(30),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      color,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                '$skillLevel/100',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: color,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+
+            const SizedBox(height: 24),
+
+            // ── Sports List ──
+            if (profile.sports.isNotEmpty) ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Sports',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: profile.sports.map((sport) {
+                  final color = Helpers.sportColor(sport);
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: color.withAlpha(25),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: color.withAlpha(60)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Helpers.sportIcon(sport),
+                            size: 18, color: color),
+                        const SizedBox(width: 6),
+                        Text(
+                          sport,
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+            ],
 
             // ── Frequency Badge ──
             Align(
@@ -241,46 +297,6 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 30),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(
-    BuildContext context,
-    IconData icon,
-    String value,
-    String label,
-  ) {
-    final theme = Theme.of(context);
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.primary.withAlpha(10),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: theme.colorScheme.outline.withAlpha(30),
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: theme.colorScheme.primary),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withAlpha(150),
-              ),
-            ),
           ],
         ),
       ),

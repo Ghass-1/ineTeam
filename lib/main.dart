@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
@@ -13,6 +15,15 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  // Enable debug logging for Firebase
+  FirebaseAuth.instance.setLanguageCode('en');
+  
+  // Enable Firestore debug logging (development only)
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+  );
+  
   runApp(const IneTeamApp());
 }
 
