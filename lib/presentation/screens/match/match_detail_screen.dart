@@ -357,6 +357,7 @@ class MatchDetailScreen extends StatelessWidget {
                                       matchId,
                                       auth.userId,
                                       'A',
+                                      match.teamAName,
                                     ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(
@@ -381,6 +382,7 @@ class MatchDetailScreen extends StatelessWidget {
                                       matchId,
                                       auth.userId,
                                       'B',
+                                      match.teamBName,
                                     ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF38BDF8), // Sky
@@ -402,20 +404,17 @@ class MatchDetailScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _joinTeam(
-    BuildContext context,
-    String matchId,
-    String userId,
-    String teamId,
-  ) async {
-    final success = await context.read<MatchProvider>().joinMatch(
-      matchId,
-      userId,
-      teamId,
-    );
+  Future<void> _joinTeam(BuildContext context, String matchId, String userId, String teamId, String teamName) async {
+    final success = await context.read<MatchProvider>().joinMatch(matchId, userId, teamId);
     if (context.mounted) {
       if (success) {
-        Helpers.showSnackBar(context, 'Joined Team $teamId! 🎉');
+        if (teamName.startsWith("team ") || teamName.startsWith("Team ")){
+          teamName = "t" + teamName.substring(1); // show message "joined team A"
+          Helpers.showSnackBar(context, 'Joined $teamName! 🎉');
+        }
+        else{
+          Helpers.showSnackBar(context, 'Joined team $teamName! 🎉');
+        }
       } else {
         Helpers.showSnackBar(
           context,

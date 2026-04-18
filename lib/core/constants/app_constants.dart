@@ -93,5 +93,5 @@ class AppInfo {
   static const String tagline = 'Find Your Team, Own The Game';
 
   /// Only emails ending with this domain can sign up.
-  static const String allowedEmailDomain = '@inpt.ac.ma';
+  static const String allowedEmailDomain = '@ine.inpt.ac.ma';
 }
