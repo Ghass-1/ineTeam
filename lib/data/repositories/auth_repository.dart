@@ -57,6 +57,12 @@ class AuthRepository {
     await _authService.signOut();
   }
 
+  /// Sends a password reset email to the user.
+  Future<void> sendPasswordResetEmail(String email) async {
+    developer.log('[AuthRepository] Sending password reset email to: $email');
+    await _authService.sendPasswordResetEmail(email);
+  }
+
   /// Checks if the user has completed their profile setup.
   Future<bool> hasCompletedProfile(String uid) async {
     final profile = await _userService.getUserProfile(uid);

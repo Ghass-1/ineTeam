@@ -49,6 +49,16 @@ class AuthService {
     await _auth.signOut();
   }
 
+  /// Sends a password reset email to the user.
+  /// Throws [AuthServiceException] on failure.
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim());
+    } on FirebaseAuthException catch (e) {
+      throw AuthServiceException(_mapFirebaseError(e.code));
+    }
+  }
+
   /// Maps Firebase error codes to user-friendly messages.
   String _mapFirebaseError(String code) {
     switch (code) {

@@ -119,6 +119,17 @@ class AuthProvider extends ChangeNotifier {
     await _authRepository.signOut();
   }
 
+  // ─── Password Reset ──────────────────────────────────────────────────────
+  Future<void> sendPasswordResetEmail(String email) async {
+    _clearError();
+    try {
+      await _authRepository.sendPasswordResetEmail(email);
+    } catch (e) {
+      _setError('Failed to send reset email: $e');
+      rethrow;
+    }
+  }
+
   // ─── Helpers ─────────────────────────────────────────────────────────────
   void clearError() => _clearError();
 
