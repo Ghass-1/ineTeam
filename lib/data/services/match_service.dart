@@ -39,24 +39,38 @@ class MatchService {
     try {
       developer.log('[MatchService] Checking availability for $location at $dateTime');
       
-      // Get all matches for this location
+      // Get all matches for this location (only single where clause, no index needed)
       final query = await _matchesCollection
           .where('location', isEqualTo: location)
-          .where('status', whereIn: ['open', 'full'])
           .get()
           .timeout(_operationTimeout, onTimeout: () {
         throw TimeoutException('Availability check timed out.');
       });
 
-      // Check if any match has the exact same dateTime (within 1 second)
+      developer.log('[MatchService] Found ${query.docs.length} matches at this location');
+
+      // Check if any match has conflict (within 1 hour and not deleted/completed)
       final conflictExists = query.docs.any((doc) {
         final data = doc.data() as Map<String, dynamic>;
+        final status = data['status'] as String? ?? 'open';
+        
+        // Skip deleted or completed matches
+        if (status != 'open' && status != 'full') {
+          return false;
+        }
+        
         final matchDateTime = (data['dateTime'] as Timestamp?)?.toDate();
         if (matchDateTime == null) return false;
         
         // Check if within 1 hour (matches at same location & time)
         final timeDiff = matchDateTime.difference(dateTime).inMinutes.abs();
-        return timeDiff < 60; // Within 1 hour is considered a conflict
+        final hasConflict = timeDiff < 60;
+        
+        if (hasConflict) {
+          developer.log('[MatchService] Conflict found: existing match at $matchDateTime');
+        }
+        
+        return hasConflict;
       });
 
       developer.log('[MatchService] Availability check result: ${!conflictExists} (conflict: $conflictExists)');
@@ -65,7 +79,7 @@ class MatchService {
       developer.log('[MatchService] Availability check TIMEOUT');
       rethrow;
     } catch (e) {
-      developer.log('[MatchService] ERROR checking field availability: $e', error: e);
+      developer.log('[MatchService] ERROR checking field availability: $e', error: e, stackTrace: StackTrace.current);
       throw MatchServiceException('Failed to check field availability.');
     }
   }
