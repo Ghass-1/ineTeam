@@ -82,4 +82,53 @@ class UserService {
     }
     return users;
   }
+
+  /// Real-time stream of multiple user profiles by their UIDs.
+  /// Updates whenever any of the users' data changes.
+  Stream<List<UserModel>> getUsersByIdsStream(List<String> uids) async* {
+    if (uids.isEmpty) {
+      yield [];
+      return;
+    }
+
+    // For small lists, use direct whereIn query
+    if (uids.length <= 30) {
+      yield* _usersCollection
+          .where(FieldPath.documentId, whereIn: uids)
+          .snapshots()
+          .map((snapshot) {
+        return snapshot.docs
+            .map((doc) => UserModel.fromMap(
+                  doc.data() as Map<String, dynamic>,
+                  doc.id,
+                ))
+            .toList();
+      });
+    } else {
+      // For larger lists, listen to multiple batches and merge
+      final batches = <Stream<List<UserModel>>>[];
+      for (var i = 0; i < uids.length; i += 30) {
+        final batch =
+            uids.sublist(i, i + 30 > uids.length ? uids.length : i + 30);
+        batches.add(
+          _usersCollection
+              .where(FieldPath.documentId, whereIn: batch)
+              .snapshots()
+              .map((snapshot) {
+            return snapshot.docs
+                .map((doc) => UserModel.fromMap(
+                      doc.data() as Map<String, dynamic>,
+                      doc.id,
+                    ))
+                .toList();
+          }),
+        );
+      }
+
+      // Merge all batch streams
+      await for (final batch in Stream.fromIterable(batches).asyncExpand((s) => s)) {
+        yield batch;
+      }
+    }
+  }
 }

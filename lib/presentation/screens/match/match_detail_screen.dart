@@ -253,8 +253,8 @@ class MatchDetailScreen extends StatelessWidget {
                 const SizedBox(height: 24),
 
                 // ── Teams Display ──
-                FutureBuilder<List<UserModel>>(
-                  future: context.read<UserProvider>().getUsersByIds(
+                StreamBuilder<List<UserModel>>(
+                  stream: context.read<UserProvider>().getUsersByIdsStream(
                     match.playerIds,
                   ),
                   builder: (context, playerSnapshot) {

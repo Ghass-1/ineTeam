@@ -109,6 +109,11 @@ void loadProfile(String uid) {
     return await _userService.getUsersByIds(uids);
   }
 
+  /// Real-time stream of multiple users for live player list updates.
+  Stream<List<UserModel>> getUsersByIdsStream(List<String> uids) {
+    return _userService.getUsersByIdsStream(uids);
+  }
+
   @override
   void dispose() {
     _profileSub?.cancel();
