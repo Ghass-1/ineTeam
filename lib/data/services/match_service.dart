@@ -34,23 +34,38 @@ class MatchService {
   }
 
   /// Checks if a field is available at a specific exact time with timeout.
+  /// Returns true if available (no conflicts), false if already booked.
   Future<bool> isFieldAvailable(String location, DateTime dateTime) async {
     try {
+      developer.log('[MatchService] Checking availability for $location at $dateTime');
+      
+      // Get all matches for this location
       final query = await _matchesCollection
           .where('location', isEqualTo: location)
-          .where('dateTime', isEqualTo: Timestamp.fromDate(dateTime))
           .where('status', whereIn: ['open', 'full'])
-          .limit(1)
           .get()
           .timeout(_operationTimeout, onTimeout: () {
         throw TimeoutException('Availability check timed out.');
       });
 
-      return query.docs.isEmpty;
+      // Check if any match has the exact same dateTime (within 1 second)
+      final conflictExists = query.docs.any((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        final matchDateTime = (data['dateTime'] as Timestamp?)?.toDate();
+        if (matchDateTime == null) return false;
+        
+        // Check if within 1 hour (matches at same location & time)
+        final timeDiff = matchDateTime.difference(dateTime).inMinutes.abs();
+        return timeDiff < 60; // Within 1 hour is considered a conflict
+      });
+
+      developer.log('[MatchService] Availability check result: ${!conflictExists} (conflict: $conflictExists)');
+      return !conflictExists;
     } on TimeoutException {
+      developer.log('[MatchService] Availability check TIMEOUT');
       rethrow;
     } catch (e) {
-      developer.log('[MatchService] ERROR checking field availability: $e');
+      developer.log('[MatchService] ERROR checking field availability: $e', error: e);
       throw MatchServiceException('Failed to check field availability.');
     }
   }
