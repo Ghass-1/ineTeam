@@ -7,7 +7,8 @@ class UserModel {
   final String email;
   final String? profilePictureUrl;
   final List<String> sports;
-  final int skillLevel; // 1-100
+  final int skillLevel; // 1-100, average across all sports
+  final Map<String, int> sportSkills; // Per-sport skill levels (sport -> 1-100)
   final String frequency; // 'casual' | 'regular' | 'competitive'
   final List<String> createdMatches;
   final List<String> joinedMatches;
@@ -20,6 +21,7 @@ class UserModel {
     this.profilePictureUrl,
     this.sports = const [],
     this.skillLevel = 50,
+    this.sportSkills = const {},
     this.frequency = 'casual',
     this.createdMatches = const [],
     this.joinedMatches = const [],
@@ -35,6 +37,14 @@ class UserModel {
         ? name
         : (email.isNotEmpty ? email.split('@').first : 'Player');
 
+    // Parse sport skills - convert dynamic map to Map<String, int>
+    Map<String, int> parsedSportSkills = {};
+    if (map['sportSkills'] is Map) {
+      (map['sportSkills'] as Map).forEach((key, value) {
+        parsedSportSkills[key.toString()] = (value as num?)?.toInt() ?? 50;
+      });
+    }
+
     return UserModel(
       uid: uid,
       name: displayName,
@@ -42,6 +52,7 @@ class UserModel {
       profilePictureUrl: map['profilePictureUrl'],
       sports: List<String>.from(map['sports'] ?? []),
       skillLevel: map['skillLevel'] ?? 50,
+      sportSkills: parsedSportSkills,
       frequency: map['frequency'] ?? 'casual',
       createdMatches: List<String>.from(map['createdMatches'] ?? []),
       joinedMatches: List<String>.from(map['joinedMatches'] ?? []),
@@ -57,6 +68,7 @@ class UserModel {
       'profilePictureUrl': profilePictureUrl,
       'sports': sports,
       'skillLevel': skillLevel,
+      'sportSkills': sportSkills,
       'frequency': frequency,
       'createdMatches': createdMatches,
       'joinedMatches': joinedMatches,
@@ -71,6 +83,7 @@ class UserModel {
     String? profilePictureUrl,
     List<String>? sports,
     int? skillLevel,
+    Map<String, int>? sportSkills,
     String? frequency,
     List<String>? createdMatches,
     List<String>? joinedMatches,
@@ -82,6 +95,7 @@ class UserModel {
       profilePictureUrl: profilePictureUrl ?? this.profilePictureUrl,
       sports: sports ?? this.sports,
       skillLevel: skillLevel ?? this.skillLevel,
+      sportSkills: sportSkills ?? this.sportSkills,
       frequency: frequency ?? this.frequency,
       createdMatches: createdMatches ?? this.createdMatches,
       joinedMatches: joinedMatches ?? this.joinedMatches,

@@ -59,6 +59,7 @@ void loadProfile(String uid) {
     String? name,
     List<String>? sports,
     int? skillLevel,
+    Map<String, int>? sportSkills,
     String? frequency,
   }) async {
     _isLoading = true;
@@ -70,6 +71,7 @@ void loadProfile(String uid) {
       if (name != null) data['name'] = name;
       if (sports != null) data['sports'] = sports;
       if (skillLevel != null) data['skillLevel'] = skillLevel;
+      if (sportSkills != null) data['sportSkills'] = sportSkills;
       if (frequency != null) data['frequency'] = frequency;
 
       await _userService.updateUserProfile(uid, data);

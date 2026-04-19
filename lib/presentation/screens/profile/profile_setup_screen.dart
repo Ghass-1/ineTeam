@@ -37,10 +37,16 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     final averageSkill = (_sportSkillLevels.values.fold<int>(0, (a, b) => a + b.round()) 
         / _selectedSports.length).round();
 
+    // Convert sport skills from double to int for storage
+    final sportSkillsInt = _sportSkillLevels.map(
+      (sport, skill) => MapEntry(sport, skill.round()),
+    );
+
     final success = await userProvider.updateProfile(
       uid: auth.userId,
       sports: _selectedSports,
       skillLevel: averageSkill,
+      sportSkills: sportSkillsInt,
       frequency: _frequency,
     );
 
