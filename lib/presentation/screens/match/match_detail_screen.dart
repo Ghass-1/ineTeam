@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../features/auth/auth_provider.dart';
 import '../../../features/matches/match_provider.dart';
+import '../../../features/matches/matchmaking_service.dart'; // ignore: unused_import - used via matchProvider
 import '../../../features/profile/user_provider.dart';
 import '../../../data/models/match_model.dart';
 import '../../../data/models/user_model.dart';
@@ -294,6 +295,20 @@ class MatchDetailScreen extends StatelessWidget {
                           maxLimit: maxPerTeam,
                           color: const Color(0xFF38BDF8), // Sky
                         ),
+                        
+                        // ── Team Balance Suggestion ──
+                        if (players.length >= 2 && teamAPlayers.isNotEmpty && teamBPlayers.isNotEmpty)
+                          ...[
+                            const SizedBox(height: 24),
+                            _buildTeamBalanceSuggestion(
+                              context,
+                              theme,
+                              players,
+                              teamAPlayers,
+                              teamBPlayers,
+                              match,
+                            ),
+                          ],
                       ],
                     );
                   },
@@ -487,6 +502,157 @@ class MatchDetailScreen extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTeamBalanceSuggestion(
+    BuildContext context,
+    ThemeData theme,
+    List<UserModel> allPlayers,
+    List<UserModel> currentTeamA,
+    List<UserModel> currentTeamB,
+    MatchModel match,
+  ) {
+    // Use matchmaking service to suggest balanced teams
+    final matchProvider = context.read<MatchProvider>();
+    final balanceResult = matchProvider.matchmakingService.balanceTeams(allPlayers);
+
+    // Check if suggested teams are different from current teams
+    final suggestedTeamAIds = balanceResult.teamA.map((p) => p.uid).toSet();
+    final suggestedTeamBIds = balanceResult.teamB.map((p) => p.uid).toSet();
+    final currentTeamAIds = currentTeamA.map((p) => p.uid).toSet();
+    final currentTeamBIds = currentTeamB.map((p) => p.uid).toSet();
+
+    final isBalanced = suggestedTeamAIds == currentTeamAIds && suggestedTeamBIds == currentTeamBIds;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: balanceResult.isBalanced
+            ? const Color(0xFF2ECC71).withAlpha(15)
+            : const Color(0xFFF39C12).withAlpha(15),
+        border: Border.all(
+          color: balanceResult.isBalanced
+              ? const Color(0xFF2ECC71).withAlpha(50)
+              : const Color(0xFFF39C12).withAlpha(50),
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with balance status
+          Row(
+            children: [
+              Icon(
+                isBalanced ? Icons.check_circle : Icons.lightbulb_outline,
+                color: balanceResult.isBalanced
+                    ? const Color(0xFF2ECC71)
+                    : const Color(0xFFF39C12),
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isBalanced
+                      ? 'Teams are well balanced!'
+                      : 'Teams could be more balanced',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: balanceResult.isBalanced
+                        ? const Color(0xFF2ECC71)
+                        : const Color(0xFFF39C12),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Skill difference: ${balanceResult.skillDifferential.toStringAsFixed(1)} pts',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withAlpha(150),
+            ),
+          ),
+          if (!isBalanced) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Suggested team arrangement:',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        match.teamAName,
+                        style: theme.textTheme.labelMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: balanceResult.teamA
+                            .map((player) => Chip(
+                                  label: Text(
+                                    player.name.split(' ').first,
+                                    style: theme.textTheme.labelSmall,
+                                  ),
+                                  backgroundColor:
+                                      const Color(0xFF10B981).withAlpha(30),
+                                  side: BorderSide(
+                                    color:
+                                        const Color(0xFF10B981).withAlpha(50),
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        match.teamBName,
+                        style: theme.textTheme.labelMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: balanceResult.teamB
+                            .map((player) => Chip(
+                                  label: Text(
+                                    player.name.split(' ').first,
+                                    style: theme.textTheme.labelSmall,
+                                  ),
+                                  backgroundColor:
+                                      const Color(0xFF38BDF8).withAlpha(30),
+                                  side: BorderSide(
+                                    color:
+                                        const Color(0xFF38BDF8).withAlpha(50),
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
