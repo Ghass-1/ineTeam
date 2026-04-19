@@ -121,7 +121,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     validator: Validators.validateEmail,
                     decoration: const InputDecoration(
                       labelText: 'Email INPT',
-                      hintText: 'prenom.nom@inpt.ac.ma',
+                      hintText: 'prenom.nom@ine.inpt.ac.ma',
                       prefixIcon: Icon(Icons.email_outlined),
                     ),
                   ),

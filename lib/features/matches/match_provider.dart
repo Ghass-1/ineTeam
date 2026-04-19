@@ -119,12 +119,16 @@ class MatchProvider extends ChangeNotifier {
     String? description,
     int? minSkill,
     int? maxSkill,
+    String? creatorTeam, // 'A' or 'B', or null for table tennis
   }) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
+      // For table tennis, just add creator to playerIds (no teams)
+      final isTableTennis = sport == 'Table Tennis';
+      
       final match = MatchModel(
         id: _uuid.v4(),
         creatorId: creatorId,
@@ -134,7 +138,8 @@ class MatchProvider extends ChangeNotifier {
         dateTime: dateTime,
         maxPlayers: maxPlayers,
         playerIds: [creatorId], // Creator auto-joins
-        teamA: [creatorId],     // Creator goes to Team A natively
+        teamA: isTableTennis ? [] : (creatorTeam == 'B' ? [] : [creatorId]),
+        teamB: isTableTennis ? [] : (creatorTeam == 'B' ? [creatorId] : []),
         teamAName: teamAName,
         teamBName: teamBName,
         description: description,

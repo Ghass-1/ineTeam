@@ -31,6 +31,7 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
   bool _useSkillRange = false;
   RangeValues _skillRange = const RangeValues(1, 100);
   bool _isSubmitting = false;
+  String? _creatorTeam; // 'A' or 'B' for team selection
 
   // Predefined times from 17:30 to 21:30
   final List<TimeOfDay> _availableTimes = [
@@ -109,6 +110,26 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
   Future<void> _handleCreate() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Table tennis must be 1v1
+    if (_selectedSport == 'Table Tennis' && _maxPlayers != 2) {
+      Helpers.showSnackBar(
+        context,
+        'Table Tennis must have exactly 2 players (1v1)',
+        isError: true,
+      );
+      return;
+    }
+
+    // Non-table tennis sports require team selection
+    if (_selectedSport != 'Table Tennis' && _creatorTeam == null) {
+      Helpers.showSnackBar(
+        context,
+        'Please choose a team to join',
+        isError: true,
+      );
+      return;
+    }
+
     final dateTime = DateTime(
       _selectedDate.year,
       _selectedDate.month,
@@ -149,6 +170,7 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
           : _descriptionController.text.trim(),
       minSkill: _useSkillRange ? _skillRange.start.round() : null,
       maxSkill: _useSkillRange ? _skillRange.end.round() : null,
+      creatorTeam: _creatorTeam, // Pass selected team
     );
 
     if (mounted) {
@@ -211,9 +233,10 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
                       onSelected: (_) {
                         setState(() {
                           _selectedSport = sport.label;
-                          // Reset location for this sport
+                          // Reset location and team for this sport
                           _selectedLocation = sport.availableLocations.first;
                           _maxPlayers = sport.defaultMaxPlayers;
+                          _creatorTeam = null; // Reset team selection
                         });
                         _fetchReservedTimes();
                       },
@@ -446,6 +469,77 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
                 ],
 
                 const SizedBox(height: 32),
+
+                // ── Team Selection (except for Table Tennis) ──
+                if (_selectedSport != 'Table Tennis') ...[
+                  Text('Your Team', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          selected: _creatorTeam == 'A',
+                          label: Text(
+                            _teamAController.text.trim().isEmpty
+                                ? 'Team A'
+                                : _teamAController.text.trim(),
+                          ),
+                          selectedColor: Helpers.sportColor(_selectedSport)
+                              .withAlpha(40),
+                          onSelected: (_) {
+                            setState(() => _creatorTeam = 'A');
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ChoiceChip(
+                          selected: _creatorTeam == 'B',
+                          label: Text(
+                            _teamBController.text.trim().isEmpty
+                                ? 'Team B'
+                                : _teamBController.text.trim(),
+                          ),
+                          selectedColor: Helpers.sportColor(_selectedSport)
+                              .withAlpha(40),
+                          onSelected: (_) {
+                            setState(() => _creatorTeam = 'B');
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ] else ...[
+                  // Table Tennis info
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: sportColor.withAlpha(20),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: sportColor.withAlpha(50),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: sportColor),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Table Tennis is 1v1 (2 players). No teams needed.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: sportColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
+                const SizedBox(height: 20),
 
                 // ── Create Button ──
                 SizedBox(
