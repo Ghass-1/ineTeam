@@ -39,6 +39,10 @@ class MatchProvider extends ChangeNotifier {
   List<MatchModel> get filteredMatches {
     var filtered = List<MatchModel>.from(_matches);
 
+    // Filter out expired matches (dateTime has passed)
+    final now = DateTime.now();
+    filtered = filtered.where((m) => m.dateTime.isAfter(now)).toList();
+
     // Apply sport filter
     if (_selectedSportFilter != null) {
       filtered =
