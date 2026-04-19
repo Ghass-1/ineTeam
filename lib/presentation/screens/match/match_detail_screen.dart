@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -13,10 +16,23 @@ import '../../widgets/player_avatar.dart';
 import '../../widgets/skill_indicator.dart';
 
 /// Match detail screen showing full match info, players, and team balancing.
-class MatchDetailScreen extends StatelessWidget {
+class MatchDetailScreen extends StatefulWidget {
   final String matchId;
 
   const MatchDetailScreen({super.key, required this.matchId});
+
+  @override
+  State<MatchDetailScreen> createState() => _MatchDetailScreenState();
+}
+
+class _MatchDetailScreenState extends State<MatchDetailScreen> {
+  bool _repairAttempted = false;
+
+  static const Set<String> _genericCreatorNames = {
+    '',
+    'player',
+    'unknown',
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +41,7 @@ class MatchDetailScreen extends StatelessWidget {
     final auth = context.read<AuthProvider>();
 
     return StreamBuilder<MatchModel?>(
-      stream: matchProvider.matchStream(matchId),
+      stream: matchProvider.matchStream(widget.matchId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
@@ -41,6 +57,8 @@ class MatchDetailScreen extends StatelessWidget {
             body: const Center(child: Text('Match not found')),
           );
         }
+
+        _maybeRepairTeams(match);
 
         final isCreator = match.isCreator(auth.userId);
         final hasJoined = match.hasPlayer(auth.userId);
@@ -58,7 +76,7 @@ class MatchDetailScreen extends StatelessWidget {
 
                       if (!context.mounted || !confirmed) return;
 
-                      final success = await matchProvider.deleteMatch(matchId);
+                      final success = await matchProvider.deleteMatch(widget.matchId);
 
                       if (!context.mounted) return;
 
@@ -81,7 +99,7 @@ class MatchDetailScreen extends StatelessWidget {
                       }
                     } else if (val == 'complete') {
                       final success = await matchProvider.updateMatchStatus(
-                        matchId,
+                        widget.matchId,
                         'completed',
                       );
 
@@ -175,11 +193,23 @@ class MatchDetailScreen extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        'by ${match.creatorName}',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurface.withAlpha(150),
+                      StreamBuilder<UserModel?>(
+                        stream: context.read<UserProvider>().getUserByIdStream(
+                          match.creatorId,
                         ),
+                        builder: (context, creatorSnapshot) {
+                          final creatorName = _resolveCreatorName(
+                            storedCreatorName: match.creatorName,
+                            liveCreatorName: creatorSnapshot.data?.name,
+                          );
+
+                          return Text(
+                            'by $creatorName',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurface.withAlpha(150),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 16),
                       // Status badge
@@ -253,26 +283,30 @@ class MatchDetailScreen extends StatelessWidget {
                 const SizedBox(height: 24),
 
                 // ── Teams Display ──
-                StreamBuilder<List<UserModel>>(
-                  stream: context.read<UserProvider>().getUsersByIdsStream(
-                    match.playerIds,
+                FutureBuilder<_TeamPlayersData>(
+                  future: _loadTeamPlayers(
+                    context.read<UserProvider>(),
+                    match,
                   ),
                   builder: (context, playerSnapshot) {
-                    if (playerSnapshot.connectionState ==
-                        ConnectionState.waiting) {
+                    if (playerSnapshot.connectionState == ConnectionState.waiting) {
                       return const Padding(
                         padding: EdgeInsets.all(20),
                         child: Center(child: CircularProgressIndicator()),
                       );
                     }
 
-                    final players = playerSnapshot.data ?? [];
-                    final teamAPlayers = players
-                        .where((p) => match.teamA.contains(p.uid))
-                        .toList();
-                    final teamBPlayers = players
-                        .where((p) => match.teamB.contains(p.uid))
-                        .toList();
+                    final teamPlayers = playerSnapshot.data ??
+                        const _TeamPlayersData(
+                          allPlayers: [],
+                          teamAPlayers: [],
+                          teamBPlayers: [],
+                          unassignedPlayers: [],
+                        );
+                    final players = teamPlayers.allPlayers;
+                    final teamAPlayers = teamPlayers.teamAPlayers;
+                    final teamBPlayers = teamPlayers.teamBPlayers;
+                    final unassignedPlayers = teamPlayers.unassignedPlayers;
                     final maxPerTeam = match.maxPlayers ~/ 2;
 
                     return Column(
@@ -295,6 +329,22 @@ class MatchDetailScreen extends StatelessWidget {
                           maxLimit: maxPerTeam,
                           color: const Color(0xFF38BDF8), // Sky
                         ),
+                        if (unassignedPlayers.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          _buildUnassignedPlayersSection(
+                            context,
+                            theme,
+                            players: unassignedPlayers,
+                          ),
+                        ],
+                        if (kDebugMode && _shouldShowDataDiagnostics(match)) ...[
+                          const SizedBox(height: 24),
+                          _buildDataDiagnosticsSection(
+                            context,
+                            theme,
+                            match: match,
+                          ),
+                        ],
                         
                         // ── Team Balance Suggestion ──
                         if (players.length >= 2 && teamAPlayers.isNotEmpty && teamBPlayers.isNotEmpty)
@@ -344,7 +394,7 @@ class MatchDetailScreen extends StatelessWidget {
                           : OutlinedButton(
                               onPressed: () async {
                                 await context.read<MatchProvider>().leaveMatch(
-                                  matchId,
+                                  widget.matchId,
                                   auth.userId,
                                 );
                                 if (context.mounted) {
@@ -369,7 +419,7 @@ class MatchDetailScreen extends StatelessWidget {
                                   ? null
                                   : () => _joinTeam(
                                       context,
-                                      matchId,
+                                      widget.matchId,
                                       auth.userId,
                                       'A',
                                       match.teamAName,
@@ -394,7 +444,7 @@ class MatchDetailScreen extends StatelessWidget {
                                   ? null
                                   : () => _joinTeam(
                                       context,
-                                      matchId,
+                                      widget.matchId,
                                       auth.userId,
                                       'B',
                                       match.teamBName,
@@ -419,12 +469,51 @@ class MatchDetailScreen extends StatelessWidget {
     );
   }
 
+  void _maybeRepairTeams(MatchModel match) {
+    if (_repairAttempted || !_shouldRepairTeams(match)) {
+      return;
+    }
+
+    _repairAttempted = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await context.read<MatchProvider>().repairTeamAssignments(widget.matchId);
+    });
+  }
+
+  bool _shouldRepairTeams(MatchModel match) {
+    if (match.sport == 'Table Tennis' || match.playerIds.isEmpty) {
+      return false;
+    }
+
+    final assignedIds = <String>{
+      ...match.teamA.where(match.playerIds.contains),
+      ...match.teamB.where(match.playerIds.contains),
+      ...match.playerTeams.keys.where(match.playerIds.contains),
+    };
+
+    return match.playerIds.any((userId) => !assignedIds.contains(userId));
+  }
+
+  bool _shouldShowDataDiagnostics(MatchModel match) {
+    if (match.playerIds.isEmpty) return false;
+
+    final assignedIds = <String>{
+      ...match.teamA.where(match.playerIds.contains),
+      ...match.teamB.where(match.playerIds.contains),
+      ...match.playerTeams.keys.where(match.playerIds.contains),
+    };
+
+    return match.playerIds.any((userId) => !assignedIds.contains(userId)) ||
+        (match.teamA.isEmpty && match.teamB.isEmpty && match.playerIds.isNotEmpty);
+  }
+
   Future<void> _joinTeam(BuildContext context, String matchId, String userId, String teamId, String teamName) async {
     final success = await context.read<MatchProvider>().joinMatch(matchId, userId, teamId);
     if (context.mounted) {
       if (success) {
         if (teamName.startsWith("team ") || teamName.startsWith("Team ")){
-          teamName = "t" + teamName.substring(1); // show message "joined team A"
+          teamName = 't${teamName.substring(1)}'; // show message "joined team A"
           Helpers.showSnackBar(context, 'Joined $teamName! 🎉');
         }
         else{
@@ -658,6 +747,112 @@ class MatchDetailScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildUnassignedPlayersSection(
+    BuildContext context,
+    ThemeData theme, {
+    required List<UserModel> players,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF39C12).withAlpha(12),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFFF39C12).withAlpha(40),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Joined Players Without Team Assignment',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: const Color(0xFFF39C12),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'This match has joined players, but their team assignment data is missing.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withAlpha(150),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...players.map(
+              (player) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: PlayerAvatar(
+                  name: player.name,
+                  imageUrl: player.profilePictureUrl,
+                  skillLevel: player.skillLevel,
+                ),
+                title: Text(player.name, style: theme.textTheme.titleMedium),
+                subtitle: Text(
+                  player.sports.join(', '),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withAlpha(120),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDataDiagnosticsSection(
+    BuildContext context,
+    ThemeData theme, {
+    required MatchModel match,
+  }) {
+    final diagnostics = <String, Object?>{
+      'matchId': match.id,
+      'creatorId': match.creatorId,
+      'creatorTeam': match.creatorTeam,
+      'playerIds': match.playerIds,
+      'teamA': match.teamA,
+      'teamB': match.teamB,
+      'playerTeams': match.playerTeams,
+    };
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.red.withAlpha(10),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.red.withAlpha(40)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Debug: Match Team Data',
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: Colors.red,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              const JsonEncoder.withIndent('  ').convert(diagnostics),
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontFamily: 'monospace',
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildDetailRow(
     BuildContext context,
     IconData icon,
@@ -693,6 +888,100 @@ class MatchDetailScreen extends StatelessWidget {
     );
   }
 
+  String _resolveCreatorName({
+    required String storedCreatorName,
+    String? liveCreatorName,
+  }) {
+    final normalizedStored = storedCreatorName.trim().toLowerCase();
+    final normalizedLive = liveCreatorName?.trim().toLowerCase() ?? '';
+
+    if (!_genericCreatorNames.contains(normalizedStored) &&
+        storedCreatorName.trim().isNotEmpty) {
+      return storedCreatorName.trim();
+    }
+
+    if (!_genericCreatorNames.contains(normalizedLive) &&
+        (liveCreatorName?.trim().isNotEmpty ?? false)) {
+      return liveCreatorName!.trim();
+    }
+
+    return storedCreatorName.trim().isNotEmpty ? storedCreatorName.trim() : 'Player';
+  }
+
+  Future<_TeamPlayersData> _loadTeamPlayers(
+    UserProvider userProvider,
+    MatchModel match,
+  ) async {
+    final teamAPlayers = await _loadUsersForIds(
+      userProvider: userProvider,
+      userIds: match.teamA,
+      match: match,
+    );
+    final teamBPlayers = await _loadUsersForIds(
+      userProvider: userProvider,
+      userIds: match.teamB,
+      match: match,
+    );
+    final assignedIds = {
+      ...teamAPlayers.map((player) => player.uid),
+      ...teamBPlayers.map((player) => player.uid),
+    };
+    final unassignedIds = match.playerIds
+        .where((userId) => !assignedIds.contains(userId))
+        .toList();
+    final unassignedPlayers = await _loadUsersForIds(
+      userProvider: userProvider,
+      userIds: unassignedIds,
+      match: match,
+    );
+
+    return _TeamPlayersData(
+      allPlayers: [...teamAPlayers, ...teamBPlayers, ...unassignedPlayers],
+      teamAPlayers: teamAPlayers,
+      teamBPlayers: teamBPlayers,
+      unassignedPlayers: unassignedPlayers,
+    );
+  }
+
+  Future<List<UserModel>> _loadUsersForIds({
+    required UserProvider userProvider,
+    required List<String> userIds,
+    required MatchModel match,
+  }) async {
+    final users = await userProvider.getUsersByIds(userIds);
+    final usersById = {for (final user in users) user.uid: user};
+
+    return userIds.map((userId) {
+      final user = usersById[userId];
+      if (user != null) {
+        if (user.uid == match.creatorId &&
+            _genericCreatorNames.contains(user.name.trim().toLowerCase())) {
+          return user.copyWith(
+            name: _resolveCreatorName(
+              storedCreatorName: match.creatorName,
+              liveCreatorName: user.name,
+            ),
+          );
+        }
+        return user;
+      }
+
+      final fallbackName = userId == match.creatorId
+          ? _resolveCreatorName(
+              storedCreatorName: match.creatorName,
+              liveCreatorName: null,
+            )
+          : 'Player';
+
+      return UserModel(
+        uid: userId,
+        name: fallbackName,
+        email: '',
+        createdAt: match.createdAt,
+      );
+    }).toList();
+  }
+
   Future<bool> _showDeleteConfirmation(BuildContext context) async {
     return await showDialog<bool>(
           context: context,
@@ -716,4 +1005,18 @@ class MatchDetailScreen extends StatelessWidget {
         ) ??
         false;
   }
+}
+
+class _TeamPlayersData {
+  final List<UserModel> allPlayers;
+  final List<UserModel> teamAPlayers;
+  final List<UserModel> teamBPlayers;
+  final List<UserModel> unassignedPlayers;
+
+  const _TeamPlayersData({
+    required this.allPlayers,
+    required this.teamAPlayers,
+    required this.teamBPlayers,
+    required this.unassignedPlayers,
+  });
 }

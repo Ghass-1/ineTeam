@@ -5,6 +5,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/helpers.dart';
 import '../../../features/auth/auth_provider.dart';
 import '../../../features/matches/match_provider.dart';
+import '../../../features/profile/user_provider.dart';
 import '../../../data/services/match_service.dart';
 import '../../widgets/loading_overlay.dart';
 
@@ -17,6 +18,12 @@ class CreateMatchScreen extends StatefulWidget {
 }
 
 class _CreateMatchScreenState extends State<CreateMatchScreen> {
+  static const Set<String> _genericCreatorNames = {
+    '',
+    'player',
+    'unknown',
+  };
+
   final _formKey = GlobalKey<FormState>();
   final _locationController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -107,6 +114,41 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
 
   // Removed _pickTime since we now use predefined chips.
 
+  bool _isGenericCreatorName(String? name) {
+    return _genericCreatorNames.contains(name?.trim().toLowerCase() ?? '');
+  }
+
+  Future<String> _resolveCreatorName() async {
+    final auth = context.read<AuthProvider>();
+    final userProvider = context.read<UserProvider>();
+
+    final authProfileName = auth.userProfile?.name.trim();
+    if (!_isGenericCreatorName(authProfileName) &&
+        (authProfileName?.isNotEmpty ?? false)) {
+      return authProfileName!;
+    }
+
+    final loadedProfileName = userProvider.currentUser?.name.trim();
+    if (!_isGenericCreatorName(loadedProfileName) &&
+        (loadedProfileName?.isNotEmpty ?? false)) {
+      return loadedProfileName!;
+    }
+
+    final freshProfile = await userProvider.getUserById(auth.userId);
+    final freshProfileName = freshProfile?.name.trim();
+    if (!_isGenericCreatorName(freshProfileName) &&
+        (freshProfileName?.isNotEmpty ?? false)) {
+      return freshProfileName!;
+    }
+
+    final emailPrefix = auth.user?.email?.split('@').first.trim();
+    if ((emailPrefix?.isNotEmpty ?? false)) {
+      return emailPrefix!;
+    }
+
+    return 'Player';
+  }
+
   Future<void> _handleCreate() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -151,10 +193,13 @@ class _CreateMatchScreenState extends State<CreateMatchScreen> {
 
     final auth = context.read<AuthProvider>();
     final matchProvider = context.read<MatchProvider>();
+    final creatorName = await _resolveCreatorName();
+
+    if (!mounted) return;
 
     final success = await matchProvider.createMatch(
       creatorId: auth.userId,
-      creatorName: auth.userProfile?.name ?? 'Unknown',
+      creatorName: creatorName,
       sport: _selectedSport,
       location: _selectedLocation,
       dateTime: dateTime,

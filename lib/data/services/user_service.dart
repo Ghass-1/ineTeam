@@ -68,19 +68,21 @@ class UserService {
   Future<List<UserModel>> getUsersByIds(List<String> uids) async {
     if (uids.isEmpty) return [];
 
-    // Firestore 'whereIn' is limited to 30 items per query
-    final List<UserModel> users = [];
-    for (var i = 0; i < uids.length; i += 30) {
-      final batch = uids.sublist(i, i + 30 > uids.length ? uids.length : i + 30);
-      final snapshot = await _usersCollection
-          .where(FieldPath.documentId, whereIn: batch)
-          .get();
-      for (final doc in snapshot.docs) {
-        users.add(
-            UserModel.fromMap(doc.data() as Map<String, dynamic>, doc.id));
-      }
-    }
-    return users;
+    final futures = uids.map((uid) async {
+      final doc = await _usersCollection.doc(uid).get();
+      if (!doc.exists) return null;
+      return UserModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+    });
+
+    final results = await Future.wait(futures);
+    return results.whereType<UserModel>().toList();
+  }
+
+  Stream<UserModel?> getUserByIdStream(String uid) {
+    return _usersCollection.doc(uid).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return UserModel.fromMap(doc.data() as Map<String, dynamic>, uid);
+    });
   }
 
   /// Real-time stream of multiple user profiles by their UIDs.
@@ -91,44 +93,6 @@ class UserService {
       return;
     }
 
-    // For small lists, use direct whereIn query
-    if (uids.length <= 30) {
-      yield* _usersCollection
-          .where(FieldPath.documentId, whereIn: uids)
-          .snapshots()
-          .map((snapshot) {
-        return snapshot.docs
-            .map((doc) => UserModel.fromMap(
-                  doc.data() as Map<String, dynamic>,
-                  doc.id,
-                ))
-            .toList();
-      });
-    } else {
-      // For larger lists, listen to multiple batches and merge
-      final batches = <Stream<List<UserModel>>>[];
-      for (var i = 0; i < uids.length; i += 30) {
-        final batch =
-            uids.sublist(i, i + 30 > uids.length ? uids.length : i + 30);
-        batches.add(
-          _usersCollection
-              .where(FieldPath.documentId, whereIn: batch)
-              .snapshots()
-              .map((snapshot) {
-            return snapshot.docs
-                .map((doc) => UserModel.fromMap(
-                      doc.data() as Map<String, dynamic>,
-                      doc.id,
-                    ))
-                .toList();
-          }),
-        );
-      }
-
-      // Merge all batch streams
-      await for (final batch in Stream.fromIterable(batches).asyncExpand((s) => s)) {
-        yield batch;
-      }
-    }
+    yield await getUsersByIds(uids);
   }
 }

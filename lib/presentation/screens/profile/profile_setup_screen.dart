@@ -21,6 +21,18 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   String _frequency = 'casual';
   bool _isSubmitting = false;
 
+  Future<String?> _waitForUserId(AuthProvider auth) async {
+    if (auth.userId.isNotEmpty) return auth.userId;
+
+    for (var attempt = 0; attempt < 10; attempt++) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      if (!mounted) return null;
+      if (auth.userId.isNotEmpty) return auth.userId;
+    }
+
+    return auth.userId.isNotEmpty ? auth.userId : null;
+  }
+
   Future<void> _handleComplete() async {
     if (_selectedSports.isEmpty) {
       Helpers.showSnackBar(context, 'Please select at least one sport',
@@ -32,6 +44,19 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
     final auth = context.read<AuthProvider>();
     final userProvider = context.read<UserProvider>();
+    final userId = await _waitForUserId(auth);
+
+    if (!mounted) return;
+
+    if (userId == null) {
+      Helpers.showSnackBar(
+        context,
+        'Your account is still loading. Please try again in a moment.',
+        isError: true,
+      );
+      setState(() => _isSubmitting = false);
+      return;
+    }
 
     // Calculate average skill level across all sports
     final averageSkill = (_sportSkillLevels.values.fold<int>(0, (a, b) => a + b.round()) 
@@ -43,7 +68,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     );
 
     final success = await userProvider.updateProfile(
-      uid: auth.userId,
+      uid: userId,
       sports: _selectedSports,
       skillLevel: averageSkill,
       sportSkills: sportSkillsInt,
@@ -53,7 +78,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     if (success && mounted) {
       context.go('/home');
     } else if (mounted) {
-      Helpers.showSnackBar(context, 'Failed to save profile', isError: true);
+      Helpers.showSnackBar(
+        context,
+        userProvider.errorMessage ?? 'Failed to save profile',
+        isError: true,
+      );
     }
 
     if (mounted) setState(() => _isSubmitting = false);
@@ -61,6 +90,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -251,7 +281,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   )
                 else
@@ -343,8 +373,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                 SizedBox(
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : _handleComplete,
-                    child: const Text('Complete Setup'),
+                    onPressed:
+                        (_isSubmitting || auth.userId.isEmpty || auth.isProfileLoading)
+                            ? null
+                            : _handleComplete,
+                    child: Text(
+                      auth.userId.isEmpty || auth.isProfileLoading
+                          ? 'Preparing account...'
+                          : 'Complete Setup',
+                    ),
                   ),
                 ),
 

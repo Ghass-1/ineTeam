@@ -144,6 +144,10 @@ class MatchProvider extends ChangeNotifier {
         playerIds: [creatorId], // Creator auto-joins
         teamA: isTableTennis ? [] : (creatorTeam == 'B' ? [] : [creatorId]),
         teamB: isTableTennis ? [] : (creatorTeam == 'B' ? [creatorId] : []),
+        playerTeams: isTableTennis || creatorTeam == null
+            ? const {}
+            : {creatorId: creatorTeam},
+        creatorTeam: creatorTeam,
         teamAName: teamAName,
         teamBName: teamBName,
         description: description,
@@ -239,6 +243,20 @@ class MatchProvider extends ChangeNotifier {
     notifyListeners();
     return false;
   }
+  }
+
+  Future<bool> repairTeamAssignments(String matchId) async {
+    try {
+      return await _matchRepository.repairTeamAssignments(matchId);
+    } on MatchRepositoryException catch (e) {
+      _errorMessage = e.message;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _errorMessage = 'Failed to repair team assignments.';
+      notifyListeners();
+      return false;
+    }
   }
 
   // ─── Filters ─────────────────────────────────────────────────────────────

@@ -12,6 +12,8 @@ class MatchModel {
   final List<String> playerIds;
   final List<String> teamA;
   final List<String> teamB;
+  final Map<String, String> playerTeams;
+  final String? creatorTeam;
   final String teamAName;
   final String teamBName;
   final String? description;
@@ -31,6 +33,8 @@ class MatchModel {
     this.playerIds = const [],
     this.teamA = const [],
     this.teamB = const [],
+    this.playerTeams = const {},
+    this.creatorTeam,
     this.teamAName = 'Team A',
     this.teamBName = 'Team B',
     this.description,
@@ -42,6 +46,22 @@ class MatchModel {
 
   /// Creates a MatchModel from a Firestore document map.
   factory MatchModel.fromMap(Map<String, dynamic> map, String id) {
+    final rawTeamA = List<String>.from(map['teamA'] ?? []);
+    final rawTeamB = List<String>.from(map['teamB'] ?? []);
+    final parsedPlayerTeams = _parsePlayerTeams(map['playerTeams']);
+    final effectiveTeamA = rawTeamA.isNotEmpty
+        ? rawTeamA
+        : parsedPlayerTeams.entries
+            .where((entry) => entry.value == 'A')
+            .map((entry) => entry.key)
+            .toList();
+    final effectiveTeamB = rawTeamB.isNotEmpty
+        ? rawTeamB
+        : parsedPlayerTeams.entries
+            .where((entry) => entry.value == 'B')
+            .map((entry) => entry.key)
+            .toList();
+
     return MatchModel(
       id: id,
       creatorId: map['creatorId'] ?? '',
@@ -51,8 +71,12 @@ class MatchModel {
       dateTime: (map['dateTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
       maxPlayers: map['maxPlayers'] ?? 10,
       playerIds: List<String>.from(map['playerIds'] ?? []),
-      teamA: List<String>.from(map['teamA'] ?? []),
-      teamB: List<String>.from(map['teamB'] ?? []),
+      teamA: effectiveTeamA,
+      teamB: effectiveTeamB,
+      playerTeams: parsedPlayerTeams.isNotEmpty
+          ? parsedPlayerTeams
+          : _derivePlayerTeams(effectiveTeamA, effectiveTeamB),
+      creatorTeam: map['creatorTeam']?.toString(),
       teamAName: map['teamAName'] ?? 'Team A',
       teamBName: map['teamBName'] ?? 'Team B',
       description: map['description'],
@@ -75,6 +99,8 @@ class MatchModel {
       'playerIds': playerIds,
       'teamA': teamA,
       'teamB': teamB,
+      'playerTeams': playerTeams,
+      'creatorTeam': creatorTeam,
       'teamAName': teamAName,
       'teamBName': teamBName,
       'description': description,
@@ -96,6 +122,8 @@ class MatchModel {
     List<String>? playerIds,
     List<String>? teamA,
     List<String>? teamB,
+    Map<String, String>? playerTeams,
+    String? creatorTeam,
     String? teamAName,
     String? teamBName,
     String? description,
@@ -114,6 +142,8 @@ class MatchModel {
       playerIds: playerIds ?? this.playerIds,
       teamA: teamA ?? this.teamA,
       teamB: teamB ?? this.teamB,
+      playerTeams: playerTeams ?? this.playerTeams,
+      creatorTeam: creatorTeam ?? this.creatorTeam,
       teamAName: teamAName ?? this.teamAName,
       teamBName: teamBName ?? this.teamBName,
       description: description ?? this.description,
@@ -141,4 +171,27 @@ class MatchModel {
 
   /// Whether the given user is the creator.
   bool isCreator(String userId) => creatorId == userId;
+
+  static Map<String, String> _parsePlayerTeams(dynamic rawPlayerTeams) {
+    if (rawPlayerTeams is! Map) return {};
+
+    final parsed = <String, String>{};
+    rawPlayerTeams.forEach((key, value) {
+      final team = value?.toString();
+      if (team == 'A' || team == 'B') {
+        parsed[key.toString()] = team!;
+      }
+    });
+    return parsed;
+  }
+
+  static Map<String, String> _derivePlayerTeams(
+    List<String> teamA,
+    List<String> teamB,
+  ) {
+    return {
+      for (final userId in teamA) userId: 'A',
+      for (final userId in teamB) userId: 'B',
+    };
+  }
 }

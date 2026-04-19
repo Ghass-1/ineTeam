@@ -105,6 +105,55 @@ class MatchService {
     }
   }
 
+  /// Repairs missing or inconsistent team assignments for legacy/corrupted matches.
+  Future<bool> repairTeamAssignments(String matchId) async {
+    try {
+      final repaired = await _firestore.runTransaction<bool>((transaction) async {
+        final doc = await transaction.get(_matchesCollection.doc(matchId));
+        if (!doc.exists) {
+          throw MatchServiceException('Match not found.');
+        }
+
+        final match = MatchModel.fromMap(
+          doc.data() as Map<String, dynamic>,
+          matchId,
+        );
+
+        if (!_needsTeamRepair(match)) {
+          return false;
+        }
+
+        final repairedPlayerTeams = _buildRepairedPlayerTeams(match);
+        final repairedTeamA = match.playerIds
+            .where((userId) => repairedPlayerTeams[userId] == 'A')
+            .toList();
+        final repairedTeamB = match.playerIds
+            .where((userId) => repairedPlayerTeams[userId] == 'B')
+            .toList();
+
+        transaction.update(_matchesCollection.doc(matchId), {
+          'teamA': repairedTeamA,
+          'teamB': repairedTeamB,
+          'playerTeams': repairedPlayerTeams,
+          'creatorTeam': repairedPlayerTeams[match.creatorId],
+        });
+
+        return true;
+      }).timeout(_operationTimeout, onTimeout: () {
+        throw TimeoutException('Repairing teams timed out. Please try again.');
+      });
+
+      return repaired;
+    } on MatchServiceException {
+      rethrow;
+    } on TimeoutException {
+      rethrow;
+    } catch (e) {
+      developer.log('[MatchService] ERROR repairing teams for $matchId: $e');
+      throw MatchServiceException('Failed to repair team assignments.');
+    }
+  }
+
   /// Returns all reserved date times for a particular location on a specific day.
   Future<List<DateTime>> getReservedTimesForDay(
     String location,
@@ -213,11 +262,16 @@ class MatchService {
         final newStatus = newPlayerIds.length >= match.maxPlayers
             ? 'full'
             : 'open';
+        final newPlayerTeams = {
+          ...match.playerTeams,
+          userId: teamId,
+        };
 
         transaction.update(_matchesCollection.doc(matchId), {
           'playerIds': newPlayerIds,
           if (teamId == 'A') 'teamA': newTeamArray,
           if (teamId == 'B') 'teamB': newTeamArray,
+          'playerTeams': newPlayerTeams,
           'status': newStatus,
         });
 
@@ -263,6 +317,8 @@ class MatchService {
         final newPlayerIds = match.playerIds.where((id) => id != userId).toList();
         final newTeamA = match.teamA.where((id) => id != userId).toList();
         final newTeamB = match.teamB.where((id) => id != userId).toList();
+        final newPlayerTeams = Map<String, String>.from(match.playerTeams)
+          ..remove(userId);
 
         final newStatus = newPlayerIds.length >= match.maxPlayers
             ? 'full'
@@ -272,6 +328,7 @@ class MatchService {
           'playerIds': newPlayerIds,
           'teamA': newTeamA,
           'teamB': newTeamB,
+          'playerTeams': newPlayerTeams,
           'status': newStatus,
         });
       }).timeout(_operationTimeout, onTimeout: () {
@@ -386,5 +443,77 @@ class MatchService {
     
     // TODO: Implement actual notifications when messaging service is set up
     // Could store notifications in a 'notifications' collection or use FCM
+  }
+
+  bool _needsTeamRepair(MatchModel match) {
+    if (match.playerIds.isEmpty || match.sport == 'Table Tennis') {
+      return false;
+    }
+
+    final assignedIds = <String>{
+      ...match.teamA.where(match.playerIds.contains),
+      ...match.teamB.where(match.playerIds.contains),
+      ...match.playerTeams.keys.where(match.playerIds.contains),
+    };
+
+    final missingAssignments =
+        match.playerIds.any((userId) => !assignedIds.contains(userId));
+    final hasEmptyTeamsWithPlayers =
+        match.playerIds.isNotEmpty && match.teamA.isEmpty && match.teamB.isEmpty;
+    final arraysMismatchMap = match.playerIds.any((userId) {
+      final team = match.playerTeams[userId];
+      if (team == null) return false;
+      return (team == 'A' && !match.teamA.contains(userId)) ||
+          (team == 'B' && !match.teamB.contains(userId));
+    });
+
+    return missingAssignments ||
+        hasEmptyTeamsWithPlayers ||
+        arraysMismatchMap ||
+        match.playerTeams.isEmpty;
+  }
+
+  Map<String, String> _buildRepairedPlayerTeams(MatchModel match) {
+    final maxPerTeam = match.maxPlayers ~/ 2;
+    final repaired = <String, String>{};
+
+    for (final userId in match.playerIds) {
+      final storedTeam = match.playerTeams[userId];
+      if (storedTeam == 'A' || storedTeam == 'B') {
+        repaired[userId] = storedTeam!;
+        continue;
+      }
+
+      if (match.teamA.contains(userId)) {
+        repaired[userId] = 'A';
+        continue;
+      }
+
+      if (match.teamB.contains(userId)) {
+        repaired[userId] = 'B';
+      }
+    }
+
+    if (match.playerIds.contains(match.creatorId) &&
+        !repaired.containsKey(match.creatorId)) {
+      repaired[match.creatorId] = match.creatorTeam == 'B' ? 'B' : 'A';
+    }
+
+    for (final userId in match.playerIds) {
+      if (repaired.containsKey(userId)) continue;
+
+      final teamACount = repaired.values.where((team) => team == 'A').length;
+      final teamBCount = repaired.values.where((team) => team == 'B').length;
+
+      if (teamACount >= maxPerTeam && teamBCount < maxPerTeam) {
+        repaired[userId] = 'B';
+      } else if (teamBCount >= maxPerTeam && teamACount < maxPerTeam) {
+        repaired[userId] = 'A';
+      } else {
+        repaired[userId] = teamACount <= teamBCount ? 'A' : 'B';
+      }
+    }
+
+    return repaired;
   }
 }

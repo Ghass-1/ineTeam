@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/utils/helpers.dart';
 import '../../data/models/match_model.dart';
+import '../../data/models/user_model.dart';
+import '../../features/profile/user_provider.dart';
 
 /// A premium match card for displaying match information in lists.
 class MatchCard extends StatelessWidget {
+  static const Set<String> _genericCreatorNames = {
+    '',
+    'player',
+    'unknown',
+  };
+
   final MatchModel match;
   final VoidCallback? onTap;
 
@@ -71,11 +80,23 @@ class MatchCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          'by ${match.creatorName}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurface.withAlpha(150),
+                        StreamBuilder<UserModel?>(
+                          stream: context.read<UserProvider>().getUserByIdStream(
+                            match.creatorId,
                           ),
+                          builder: (context, creatorSnapshot) {
+                            final creatorName = _resolveCreatorName(
+                              storedCreatorName: match.creatorName,
+                              liveCreatorName: creatorSnapshot.data?.name,
+                            );
+
+                            return Text(
+                              'by $creatorName',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface.withAlpha(150),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -219,5 +240,25 @@ class MatchCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _resolveCreatorName({
+    required String storedCreatorName,
+    String? liveCreatorName,
+  }) {
+    final normalizedStored = storedCreatorName.trim().toLowerCase();
+    final normalizedLive = liveCreatorName?.trim().toLowerCase() ?? '';
+
+    if (!_genericCreatorNames.contains(normalizedStored) &&
+        storedCreatorName.trim().isNotEmpty) {
+      return storedCreatorName.trim();
+    }
+
+    if (!_genericCreatorNames.contains(normalizedLive) &&
+        (liveCreatorName?.trim().isNotEmpty ?? false)) {
+      return liveCreatorName!.trim();
+    }
+
+    return storedCreatorName.trim().isNotEmpty ? storedCreatorName.trim() : 'Player';
   }
 }

@@ -67,6 +67,10 @@ void loadProfile(String uid) {
     notifyListeners();
 
     try {
+      if (uid.trim().isEmpty) {
+        throw Exception('User session is not ready yet.');
+      }
+
       final data = <String, dynamic>{};
       if (name != null) data['name'] = name;
       if (sports != null) data['sports'] = sports;
@@ -79,7 +83,7 @@ void loadProfile(String uid) {
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = 'Failed to update profile.';
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
       _isLoading = false;
       notifyListeners();
       return false;
@@ -105,6 +109,10 @@ void loadProfile(String uid) {
   }
 
   // ─── Get Users by IDs (for match players) ────────────────────────────────
+  Future<UserModel?> getUserById(String uid) async {
+    return _userService.getUserProfile(uid);
+  }
+
   Future<List<UserModel>> getUsersByIds(List<String> uids) async {
     return await _userService.getUsersByIds(uids);
   }
@@ -112,6 +120,11 @@ void loadProfile(String uid) {
   /// Real-time stream of multiple users for live player list updates.
   Stream<List<UserModel>> getUsersByIdsStream(List<String> uids) {
     return _userService.getUsersByIdsStream(uids);
+  }
+
+  /// Real-time stream of a single user profile by UID.
+  Stream<UserModel?> getUserByIdStream(String uid) {
+    return _userService.getUserByIdStream(uid);
   }
 
   @override
