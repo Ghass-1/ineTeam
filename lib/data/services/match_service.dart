@@ -1,38 +1,79 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/exceptions/app_exceptions.dart';
 import 'dart:developer' as developer;
 import '../models/match_model.dart';
 
-/// Handles all Firestore operations for matches.
+/// Handles all Firestore operations for matches with timeout and error handling.
 class MatchService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  static const _operationTimeout = Duration(seconds: 15);
 
   CollectionReference get _matchesCollection =>
       _firestore.collection(FirestoreCollections.matches);
 
-  /// Creates a new match document.
-  /// Creates a new match document.
+  /// Creates a new match document with timeout and error handling.
+  /// Throws [MatchServiceException] if creation fails.
   Future<void> createMatch(MatchModel match) async {
-    await _matchesCollection.doc(match.id).set(match.toMap());
+    try {
+      await _matchesCollection
+          .doc(match.id)
+          .set(match.toMap())
+          .timeout(_operationTimeout, onTimeout: () {
+        throw TimeoutException('Match creation timed out. Please check your connection.');
+      });
+    } on TimeoutException {
+      rethrow;
+    } on FirebaseException catch (e) {
+      developer.log('[MatchService] ERROR creating match: $e');
+      throw MatchServiceException('Failed to create match: ${e.message}');
+    } catch (e) {
+      developer.log('[MatchService] Unexpected error creating match: $e');
+      throw MatchServiceException('An unexpected error occurred.');
+    }
   }
 
-  /// Checks if a field is available at a specific exact time.
+  /// Checks if a field is available at a specific exact time with timeout.
   Future<bool> isFieldAvailable(String location, DateTime dateTime) async {
-    final query = await _matchesCollection
-        .where('location', isEqualTo: location)
-        .where('dateTime', isEqualTo: Timestamp.fromDate(dateTime))
-        .where('status', whereIn: ['open', 'full'])
-        .limit(1)
-        .get();
+    try {
+      final query = await _matchesCollection
+          .where('location', isEqualTo: location)
+          .where('dateTime', isEqualTo: Timestamp.fromDate(dateTime))
+          .where('status', whereIn: ['open', 'full'])
+          .limit(1)
+          .get()
+          .timeout(_operationTimeout, onTimeout: () {
+        throw TimeoutException('Availability check timed out.');
+      });
 
-    return query.docs.isEmpty;
+      return query.docs.isEmpty;
+    } on TimeoutException {
+      rethrow;
+    } catch (e) {
+      developer.log('[MatchService] ERROR checking field availability: $e');
+      throw MatchServiceException('Failed to check field availability.');
+    }
   }
 
-  /// Fetches a single match by ID.
+  /// Fetches a single match by ID with timeout.
+  /// Throws [MatchServiceException] on failure.
   Future<MatchModel?> getMatchById(String matchId) async {
-    final doc = await _matchesCollection.doc(matchId).get();
-    if (!doc.exists) return null;
-    return MatchModel.fromMap(doc.data() as Map<String, dynamic>, matchId);
+    try {
+      final doc = await _matchesCollection
+          .doc(matchId)
+          .get()
+          .timeout(_operationTimeout, onTimeout: () {
+        throw TimeoutException('Match fetch timed out.');
+      });
+
+      if (!doc.exists) return null;
+      return MatchModel.fromMap(doc.data() as Map<String, dynamic>, matchId);
+    } on TimeoutException {
+      rethrow;
+    } catch (e) {
+      developer.log('[MatchService] ERROR fetching match $matchId: $e');
+      throw MatchServiceException('Failed to fetch match details.');
+    }
   }
 
   /// Returns all reserved date times for a particular location on a specific day.
@@ -95,78 +136,127 @@ class MatchService {
     });
   }
 
-  /// Adds a player to a match explicitly via team logic.
-  /// Returns false if the team or match is already full.
+  /// Adds a player to a match with validation and timeout.
+  /// Throws [MatchServiceException] with specific error messages.
+  /// Returns true if successfully joined, false if validation fails.
   Future<bool> joinMatch(String matchId, String userId, String teamId) async {
-    return _firestore.runTransaction<bool>((transaction) async {
-      final doc = await transaction.get(_matchesCollection.doc(matchId));
-      if (!doc.exists) return false;
+    try {
+      final result = await _firestore.runTransaction<bool>((transaction) async {
+        final doc = await transaction.get(_matchesCollection.doc(matchId));
+        if (!doc.exists) {
+          throw MatchServiceException('Match not found.');
+        }
 
-      final match = MatchModel.fromMap(
-        doc.data() as Map<String, dynamic>,
-        matchId,
-      );
+        final match = MatchModel.fromMap(
+          doc.data() as Map<String, dynamic>,
+          matchId,
+        );
 
-      // Prevent joining a full match or duplicates
-      if (match.isFull || match.hasPlayer(userId)) return false;
+        // Validate match status
+        if (match.isFull) {
+          throw MatchServiceException('This match is full.');
+        }
 
-      // Determine max players per team
-      final maxPerTeam = match.maxPlayers ~/ 2;
+        // Prevent duplicate joins (already in match)
+        if (match.hasPlayer(userId)) {
+          throw MatchServiceException('You are already in this match.');
+        }
 
-      List<String> currentTeamArray;
-      if (teamId == 'A') {
-        currentTeamArray = match.teamA;
-      } else if (teamId == 'B')
-        currentTeamArray = match.teamB;
-      else
-        return false;
+        // Determine max players per team
+        final maxPerTeam = match.maxPlayers ~/ 2;
 
-      // Prevent joining full team
-      if (currentTeamArray.length >= maxPerTeam) return false;
+        List<String> currentTeamArray;
+        if (teamId == 'A') {
+          currentTeamArray = match.teamA;
+        } else if (teamId == 'B') {
+          currentTeamArray = match.teamB;
+        } else {
+          throw ValidationException('Invalid team ID.');
+        }
 
-      final newPlayerIds = [...match.playerIds, userId];
-      final newTeamArray = [...currentTeamArray, userId];
-      final newStatus = newPlayerIds.length >= match.maxPlayers
-          ? 'full'
-          : 'open';
+        // Prevent joining full team
+        if (currentTeamArray.length >= maxPerTeam) {
+          throw MatchServiceException('This team is full.');
+        }
 
-      transaction.update(_matchesCollection.doc(matchId), {
-        'playerIds': newPlayerIds,
-        if (teamId == 'A') 'teamA': newTeamArray,
-        if (teamId == 'B') 'teamB': newTeamArray,
-        'status': newStatus,
+        final newPlayerIds = [...match.playerIds, userId];
+        final newTeamArray = [...currentTeamArray, userId];
+        final newStatus = newPlayerIds.length >= match.maxPlayers
+            ? 'full'
+            : 'open';
+
+        transaction.update(_matchesCollection.doc(matchId), {
+          'playerIds': newPlayerIds,
+          if (teamId == 'A') 'teamA': newTeamArray,
+          if (teamId == 'B') 'teamB': newTeamArray,
+          'status': newStatus,
+        });
+
+        return true;
+      }).timeout(_operationTimeout, onTimeout: () {
+        throw TimeoutException('Joining match timed out. Please try again.');
       });
 
-      return true;
-    });
+      return result;
+    } on MatchServiceException {
+      developer.log('[MatchService] Validation error joining match: $userId to $matchId');
+      rethrow;
+    } on ValidationException {
+      rethrow;
+    } on TimeoutException {
+      rethrow;
+    } catch (e) {
+      developer.log('[MatchService] ERROR joining match: $e');
+      throw MatchServiceException('Failed to join match. Please try again.');
+    }
   }
 
-  /// Removes a player from a match and all teams.
+  /// Removes a player from a match and all teams with timeout.
+  /// Throws [MatchServiceException] if operation fails.
   Future<void> leaveMatch(String matchId, String userId) async {
-    return _firestore.runTransaction((transaction) async {
-      final doc = await transaction.get(_matchesCollection.doc(matchId));
-      if (!doc.exists) return;
+    try {
+      await _firestore.runTransaction((transaction) async {
+        final doc = await transaction.get(_matchesCollection.doc(matchId));
+        if (!doc.exists) {
+          throw MatchServiceException('Match not found.');
+        }
 
-      final match = MatchModel.fromMap(
-        doc.data() as Map<String, dynamic>,
-        matchId,
-      );
+        final match = MatchModel.fromMap(
+          doc.data() as Map<String, dynamic>,
+          matchId,
+        );
 
-      final newPlayerIds = match.playerIds.where((id) => id != userId).toList();
-      final newTeamA = match.teamA.where((id) => id != userId).toList();
-      final newTeamB = match.teamB.where((id) => id != userId).toList();
+        // Check if player is actually in the match
+        if (!match.hasPlayer(userId)) {
+          throw MatchServiceException('You are not in this match.');
+        }
 
-      final newStatus = newPlayerIds.length >= match.maxPlayers
-          ? 'full'
-          : 'open';
+        final newPlayerIds = match.playerIds.where((id) => id != userId).toList();
+        final newTeamA = match.teamA.where((id) => id != userId).toList();
+        final newTeamB = match.teamB.where((id) => id != userId).toList();
 
-      transaction.update(_matchesCollection.doc(matchId), {
-        'playerIds': newPlayerIds,
-        'teamA': newTeamA,
-        'teamB': newTeamB,
-        'status': newStatus,
+        final newStatus = newPlayerIds.length >= match.maxPlayers
+            ? 'full'
+            : 'open';
+
+        transaction.update(_matchesCollection.doc(matchId), {
+          'playerIds': newPlayerIds,
+          'teamA': newTeamA,
+          'teamB': newTeamB,
+          'status': newStatus,
+        });
+      }).timeout(_operationTimeout, onTimeout: () {
+        throw TimeoutException('Leaving match timed out. Please try again.');
       });
-    });
+    } on MatchServiceException {
+      developer.log('[MatchService] Validation error leaving match: $userId from $matchId');
+      rethrow;
+    } on TimeoutException {
+      rethrow;
+    } catch (e) {
+      developer.log('[MatchService] ERROR leaving match: $e');
+      throw MatchServiceException('Failed to leave match. Please try again.');
+    }
   }
 
   /// Updates match status (e.g. to 'completed').
