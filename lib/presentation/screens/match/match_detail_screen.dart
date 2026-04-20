@@ -27,6 +27,8 @@ class MatchDetailScreen extends StatefulWidget {
 
 class _MatchDetailScreenState extends State<MatchDetailScreen> {
   bool _repairAttempted = false;
+  String? _teamPlayersCacheKey;
+  Future<_TeamPlayersData>? _teamPlayersFuture;
 
   static const Set<String> _genericCreatorNames = {
     '',
@@ -59,6 +61,7 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
         }
 
         _maybeRepairTeams(match);
+        _ensureTeamPlayersFuture(context.read<UserProvider>(), match);
 
         final isCreator = match.isCreator(auth.userId);
         final hasJoined = match.hasPlayer(auth.userId);
@@ -284,10 +287,7 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
 
                 // ── Teams Display ──
                 FutureBuilder<_TeamPlayersData>(
-                  future: _loadTeamPlayers(
-                    context.read<UserProvider>(),
-                    match,
-                  ),
+                  future: _teamPlayersFuture,
                   builder: (context, playerSnapshot) {
                     if (playerSnapshot.connectionState == ConnectionState.waiting) {
                       return const Padding(
@@ -316,7 +316,9 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
                           context,
                           theme,
                           teamName: match.teamAName,
+                          playerIds: match.teamA,
                           players: teamAPlayers,
+                          match: match,
                           maxLimit: maxPerTeam,
                           color: const Color(0xFF10B981), // Emerald
                         ),
@@ -325,7 +327,9 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
                           context,
                           theme,
                           teamName: match.teamBName,
+                          playerIds: match.teamB,
                           players: teamBPlayers,
+                          match: match,
                           maxLimit: maxPerTeam,
                           color: const Color(0xFF38BDF8), // Sky
                         ),
@@ -481,6 +485,33 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
     });
   }
 
+  void _ensureTeamPlayersFuture(
+    UserProvider userProvider,
+    MatchModel match,
+  ) {
+    final nextKey = [
+      match.id,
+      match.creatorName,
+      ...match.playerIds,
+      '|A|',
+      ...match.teamA,
+      '|B|',
+      ...match.teamB,
+      '|Teams|',
+      ...match.playerTeams.entries
+          .map((entry) => '${entry.key}:${entry.value}')
+          .toList()
+        ..sort(),
+    ].join(':');
+
+    if (_teamPlayersCacheKey == nextKey && _teamPlayersFuture != null) {
+      return;
+    }
+
+    _teamPlayersCacheKey = nextKey;
+    _teamPlayersFuture = _loadTeamPlayers(userProvider, match);
+  }
+
   bool _shouldRepairTeams(MatchModel match) {
     if (match.sport == 'Table Tennis' || match.playerIds.isEmpty) {
       return false;
@@ -533,10 +564,18 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
     BuildContext context,
     ThemeData theme, {
     required String teamName,
+    required List<String> playerIds,
     required List<UserModel> players,
+    required MatchModel match,
     required int maxLimit,
     required Color color,
   }) {
+    final seededPlayers = _mergeResolvedPlayers(
+      players: players,
+      playerIds: playerIds,
+      match: match,
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -550,15 +589,15 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
                 style: theme.textTheme.titleLarge?.copyWith(color: color),
               ),
               Text(
-                '${players.length}/$maxLimit',
+                '${playerIds.length}/$maxLimit',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: players.length >= maxLimit ? Colors.red : color,
+                  color: playerIds.length >= maxLimit ? Colors.red : color,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          if (players.isEmpty)
+          if (playerIds.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: Text(
@@ -569,31 +608,57 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
               ),
             )
           else
-            ...players.map(
-              (player) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: PlayerAvatar(
-                  name: player.name,
-                  imageUrl: player.profilePictureUrl,
-                  skillLevel: player.skillLevel,
-                ),
-                title: Text(player.name, style: theme.textTheme.titleMedium),
-                subtitle: Text(
-                  player.sports.join(', '),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withAlpha(120),
+            StreamBuilder<List<UserModel>>(
+              stream: context.read<UserProvider>().getUsersByIdsStream(playerIds),
+              initialData: seededPlayers,
+              builder: (context, snapshot) {
+                final resolvedPlayers = _mergeResolvedPlayers(
+                  players: snapshot.data ?? seededPlayers,
+                  playerIds: playerIds,
+                  match: match,
+                );
+
+                return Column(
+                  children: _buildPlayerTiles(
+                    theme: theme,
+                    players: resolvedPlayers,
                   ),
-                ),
-                trailing: SkillIndicator(
-                  skillLevel: player.skillLevel,
-                  size: 36,
-                  showLabel: false,
-                ),
-              ),
+                );
+              },
             ),
         ],
       ),
     );
+  }
+
+  List<Widget> _buildPlayerTiles({
+    required ThemeData theme,
+    required List<UserModel> players,
+  }) {
+    return players.map((player) {
+      final sportsLabel = player.sports.isEmpty ? 'Player joined' : player.sports.join(', ');
+
+      return ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: PlayerAvatar(
+          name: player.name,
+          imageUrl: player.profilePictureUrl,
+          skillLevel: player.skillLevel,
+        ),
+        title: Text(player.name, style: theme.textTheme.titleMedium),
+        subtitle: Text(
+          sportsLabel,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurface.withAlpha(120),
+          ),
+        ),
+        trailing: SkillIndicator(
+          skillLevel: player.skillLevel,
+          size: 36,
+          showLabel: false,
+        ),
+      );
+    }).toList();
   }
 
   Widget _buildTeamBalanceSuggestion(
@@ -912,13 +977,21 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
     UserProvider userProvider,
     MatchModel match,
   ) async {
-    final teamAPlayers = await _loadUsersForIds(
-      userProvider: userProvider,
+    final allUserIds = <String>{
+      ...match.teamA,
+      ...match.teamB,
+      ...match.playerIds,
+    }.toList();
+    final users = await userProvider.getUsersByIds(allUserIds);
+    final usersById = {for (final user in users) user.uid: user};
+
+    final teamAPlayers = _mapUsersForIds(
+      usersById: usersById,
       userIds: match.teamA,
       match: match,
     );
-    final teamBPlayers = await _loadUsersForIds(
-      userProvider: userProvider,
+    final teamBPlayers = _mapUsersForIds(
+      usersById: usersById,
       userIds: match.teamB,
       match: match,
     );
@@ -929,8 +1002,8 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
     final unassignedIds = match.playerIds
         .where((userId) => !assignedIds.contains(userId))
         .toList();
-    final unassignedPlayers = await _loadUsersForIds(
-      userProvider: userProvider,
+    final unassignedPlayers = _mapUsersForIds(
+      usersById: usersById,
       userIds: unassignedIds,
       match: match,
     );
@@ -943,14 +1016,11 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
     );
   }
 
-  Future<List<UserModel>> _loadUsersForIds({
-    required UserProvider userProvider,
+  List<UserModel> _mapUsersForIds({
+    required Map<String, UserModel> usersById,
     required List<String> userIds,
     required MatchModel match,
-  }) async {
-    final users = await userProvider.getUsersByIds(userIds);
-    final usersById = {for (final user in users) user.uid: user};
-
+  }) {
     return userIds.map((userId) {
       final user = usersById[userId];
       if (user != null) {
@@ -980,6 +1050,19 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
         createdAt: match.createdAt,
       );
     }).toList();
+  }
+
+  List<UserModel> _mergeResolvedPlayers({
+    required List<UserModel> players,
+    required List<String> playerIds,
+    required MatchModel match,
+  }) {
+    final usersById = {for (final player in players) player.uid: player};
+    return _mapUsersForIds(
+      usersById: usersById,
+      userIds: playerIds,
+      match: match,
+    );
   }
 
   Future<bool> _showDeleteConfirmation(BuildContext context) async {

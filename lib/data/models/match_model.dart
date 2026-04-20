@@ -46,21 +46,22 @@ class MatchModel {
 
   /// Creates a MatchModel from a Firestore document map.
   factory MatchModel.fromMap(Map<String, dynamic> map, String id) {
+    final playerIds = List<String>.from(map['playerIds'] ?? []);
     final rawTeamA = List<String>.from(map['teamA'] ?? []);
     final rawTeamB = List<String>.from(map['teamB'] ?? []);
     final parsedPlayerTeams = _parsePlayerTeams(map['playerTeams']);
-    final effectiveTeamA = rawTeamA.isNotEmpty
-        ? rawTeamA
-        : parsedPlayerTeams.entries
-            .where((entry) => entry.value == 'A')
-            .map((entry) => entry.key)
-            .toList();
-    final effectiveTeamB = rawTeamB.isNotEmpty
-        ? rawTeamB
-        : parsedPlayerTeams.entries
-            .where((entry) => entry.value == 'B')
-            .map((entry) => entry.key)
-            .toList();
+    final effectiveTeamA = _buildEffectiveTeam(
+      playerIds: playerIds,
+      rawTeam: rawTeamA,
+      parsedPlayerTeams: parsedPlayerTeams,
+      teamId: 'A',
+    );
+    final effectiveTeamB = _buildEffectiveTeam(
+      playerIds: playerIds,
+      rawTeam: rawTeamB,
+      parsedPlayerTeams: parsedPlayerTeams,
+      teamId: 'B',
+    );
 
     return MatchModel(
       id: id,
@@ -70,7 +71,7 @@ class MatchModel {
       location: map['location'] ?? '',
       dateTime: (map['dateTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
       maxPlayers: map['maxPlayers'] ?? 10,
-      playerIds: List<String>.from(map['playerIds'] ?? []),
+      playerIds: playerIds,
       teamA: effectiveTeamA,
       teamB: effectiveTeamB,
       playerTeams: parsedPlayerTeams.isNotEmpty
@@ -193,5 +194,30 @@ class MatchModel {
       for (final userId in teamA) userId: 'A',
       for (final userId in teamB) userId: 'B',
     };
+  }
+
+  static List<String> _buildEffectiveTeam({
+    required List<String> playerIds,
+    required List<String> rawTeam,
+    required Map<String, String> parsedPlayerTeams,
+    required String teamId,
+  }) {
+    final playerIdSet = playerIds.toSet();
+    final effectiveTeam = <String>[];
+
+    for (final userId in rawTeam) {
+      if (playerIdSet.contains(userId) && !effectiveTeam.contains(userId)) {
+        effectiveTeam.add(userId);
+      }
+    }
+
+    for (final userId in playerIds) {
+      if (parsedPlayerTeams[userId] == teamId &&
+          !effectiveTeam.contains(userId)) {
+        effectiveTeam.add(userId);
+      }
+    }
+
+    return effectiveTeam;
   }
 }
