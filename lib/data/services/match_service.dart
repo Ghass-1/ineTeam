@@ -240,6 +240,30 @@ class MatchService {
           throw MatchServiceException('You are already in this match.');
         }
 
+        final userDoc = await transaction.get(
+          _firestore.collection(FirestoreCollections.users).doc(userId),
+        );
+        if (!userDoc.exists) {
+          throw MatchServiceException('Your profile was not found.');
+        }
+
+        final userData = userDoc.data() as Map<String, dynamic>;
+        final sportSkill = _extractSportSkill(
+          rawSportSkills: userData['sportSkills'],
+          sport: match.sport,
+        );
+
+        if (!_isSkillInAllowedRange(
+          skill: sportSkill,
+          minSkill: match.minSkill,
+          maxSkill: match.maxSkill,
+        )) {
+          final rangeLabel = _formatSkillRange(match.minSkill, match.maxSkill);
+          throw MatchServiceException(
+            'Your ${match.sport} level must be $rangeLabel to join this match.',
+          );
+        }
+
         // Determine max players per team
         final maxPerTeam = match.maxPlayers ~/ 2;
 
@@ -292,6 +316,57 @@ class MatchService {
       developer.log('[MatchService] ERROR joining match: $e');
       throw MatchServiceException('Failed to join match. Please try again.');
     }
+  }
+
+  int? _extractSportSkill({
+    required dynamic rawSportSkills,
+    required String sport,
+  }) {
+    if (rawSportSkills is! Map) return null;
+
+    final rawValue = rawSportSkills[sport];
+    if (rawValue is num) return rawValue.toInt();
+    return null;
+  }
+
+  bool _isSkillInAllowedRange({
+    required int? skill,
+    required int? minSkill,
+    required int? maxSkill,
+  }) {
+    if (minSkill == null && maxSkill == null) {
+      return true;
+    }
+
+    if (skill == null) {
+      return false;
+    }
+
+    if (minSkill != null && skill < minSkill) {
+      return false;
+    }
+
+    if (maxSkill != null && skill > maxSkill) {
+      return false;
+    }
+
+    return true;
+  }
+
+  String _formatSkillRange(int? minSkill, int? maxSkill) {
+    if (minSkill != null && maxSkill != null) {
+      return 'between $minSkill and $maxSkill';
+    }
+
+    if (minSkill != null) {
+      return 'at least $minSkill';
+    }
+
+    if (maxSkill != null) {
+      return 'at most $maxSkill';
+    }
+
+    return 'within the required range';
   }
 
   /// Removes a player from a match and all teams with timeout.

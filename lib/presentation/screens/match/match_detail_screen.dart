@@ -622,6 +622,7 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
                   children: _buildPlayerTiles(
                     theme: theme,
                     players: resolvedPlayers,
+                    sport: match.sport,
                   ),
                 );
               },
@@ -634,29 +635,35 @@ class _MatchDetailScreenState extends State<MatchDetailScreen> {
   List<Widget> _buildPlayerTiles({
     required ThemeData theme,
     required List<UserModel> players,
+    required String sport,
   }) {
     return players.map((player) {
-      final sportsLabel = player.sports.isEmpty ? 'Player joined' : player.sports.join(', ');
+      final sportSkill = player.sportSkills[sport];
+      final skillLabel = sportSkill == null ? null : 'Level $sportSkill';
 
       return ListTile(
         contentPadding: EdgeInsets.zero,
         leading: PlayerAvatar(
           name: player.name,
           imageUrl: player.profilePictureUrl,
-          skillLevel: player.skillLevel,
+          skillLevel: sportSkill,
         ),
         title: Text(player.name, style: theme.textTheme.titleMedium),
-        subtitle: Text(
-          sportsLabel,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurface.withAlpha(120),
-          ),
-        ),
-        trailing: SkillIndicator(
-          skillLevel: player.skillLevel,
-          size: 36,
-          showLabel: false,
-        ),
+        subtitle: skillLabel == null
+            ? null
+            : Text(
+                skillLabel,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withAlpha(120),
+                ),
+              ),
+        trailing: sportSkill == null
+            ? const SizedBox.shrink()
+            : SkillIndicator(
+                skillLevel: sportSkill,
+                size: 36,
+                showLabel: false,
+              ),
       );
     }).toList();
   }
