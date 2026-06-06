@@ -37,9 +37,13 @@ class NotificationProvider extends ChangeNotifier {
 
     if (userId != null) {
       // 1. Start push notification setup in parallel (don't block the stream)
-      _setupPushNotifications(userId);
+      // Catch errors (APNS token missing on simulator, permission issues, etc.)
+      _setupPushNotifications(userId).catchError((e) {
+        debugPrint('Push setup error: $e');
+      });
 
       // 2. Initialize Firestore stream listener immediately
+      // Add an onError handler so Firestore permission issues don't crash the app.
       _sub = _notificationService.getUserNotifications(userId).listen((data) {
         if (!_isFirstLoad) {
           for (final notification in data) {
@@ -68,6 +72,8 @@ class NotificationProvider extends ChangeNotifier {
         }
         _notifications = data;
         notifyListeners();
+      }, onError: (e) {
+        debugPrint('Notification stream error: $e');
       });
     } else {
       notifyListeners();
@@ -190,9 +196,14 @@ class NotificationProvider extends ChangeNotifier {
   Future<void> _setupPushNotifications(String userId) async {
     await requestPermission();
 
-    String? token = await _messaging.getToken();
-    if (token != null) {
-      await _notificationService.updateFcmToken(userId, token);
+    try {
+      String? token = await _messaging.getToken();
+      if (token != null) {
+        await _notificationService.updateFcmToken(userId, token);
+      }
+    } catch (e) {
+      // On simulators APNS token may not be available; don't let this crash the app.
+      debugPrint('Failed to get FCM token: $e');
     }
 
     if (!kIsWeb) {

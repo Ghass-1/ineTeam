@@ -20,7 +20,21 @@ late FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  WidgetsFlutterBinding.ensureInitialized();
+  // Only initialize if no Firebase app instances exist in this isolate.
+  if (Firebase.apps.isEmpty) {
+    try {
+      await Firebase.initializeApp();
+    } catch (e) {
+      // Ignore duplicate-app errors which can happen if the background
+      // isolate or another part of the app already initialized Firebase.
+      if (e.toString().contains('duplicate-app')) {
+        // already initialized in this isolate — safe to ignore
+      } else {
+        rethrow;
+      }
+    }
+  }
   
   // If the message contains data but no notification, we might want to show a local notification
   // to ensure a popup appears. If it has a notification block, the OS handles it.
@@ -53,9 +67,21 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Avoid duplicate initialization if an app already exists (e.g., background isolate).
+  if (Firebase.apps.isEmpty) {
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } catch (e) {
+      // Suppress duplicate-app errors — allow the app to continue running.
+      if (e.toString().contains('duplicate-app')) {
+        // noop
+      } else {
+        rethrow;
+      }
+    }
+  }
 
   // Set the background messaging handler early on, as a named top-level function
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
